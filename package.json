@@ -1,0 +1,23 @@
+{
+  "name": "signals",
+  "version": "1.0.0",
+  "description": "Creating a signals, values over time library to consume a callback and array",
+  "main": "src/Signal.coffee",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "bluebird": "^2.10.1",
+    "lodash": "^3.10.1"
+  },
+  "devDependencies": {
+    "mocha": "^2.3.3",
+    "chai": "^3.3.0",
+    "coffee-script": "^1.10.0"
+  },
+  "scripts": {
+    "test": "mocha -w --compilers coffee:coffee-script/register"
+  },
+  "author": "",
+  "license": "ISC"
+}
