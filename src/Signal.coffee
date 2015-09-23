@@ -94,9 +94,13 @@ module.exports = class Signals
       @tailSignal = signal
       signal.getNext()?.then (nextSignal) =>
         @update nextSignal
+  getLatest = (signalA) -> new CurrentSignal signalA
 
+  ###*
+   * These are functions that will return a signal that follows the tails, ensuring that the latest is always there.
+  ###
   @latest =
-    fromFunction: _.compose ((a) -> new CurrentSignal a), Signals.fromFunction
+    fromFunction: _.compose getLatest, Signals.fromFunction
 
   ###*
    * This is a each loop that is expecting side effeces

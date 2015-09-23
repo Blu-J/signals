@@ -46,7 +46,7 @@ describe 'With Signal', ->
         newValue = ''
         sinker = null
         ANSWER = 'test'
-        mainSignal = Signal.fromFunction (sink) ->
+        mainSignal = Signal.latest.fromFunction (sink) ->
           sinker = sink
         sinker ANSWER
         Signal.onValue (mainSignalValue) ->
