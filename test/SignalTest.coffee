@@ -62,7 +62,7 @@ describe 'With Signal', ->
         wrongAnswer = 'firstWrongAnswer'
         wrongAnswer2 = 'second WrongAnswer'
         ANSWER = 'test'
-        mainSignal = Signal.fromFunction (sink) ->
+        mainSignal = Signal.latest.fromFunction (sink) ->
           sinker = sink
 
         sinker wrongAnswer
@@ -83,7 +83,7 @@ describe 'With Signal', ->
         answerPartOne = 'part1'
         answerPartTwo = 'part2'
         answer = answerPartOne + answerPartTwo
-        mainSignal = Signal.fromFunction (sink) ->
+        mainSignal = Signal.latest.fromFunction (sink) ->
           sinker = sink
 
         sinker wrongAnswer

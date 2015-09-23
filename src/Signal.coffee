@@ -41,7 +41,7 @@ module.exports = class Signals
         currentResolve = resolve
       new Signal value, -> newPromise
 
-    answer = new CurrentSignal newTail initValue
+    answer = newTail initValue
     sinkNewValue (newValue) ->
       currentResolve newTail newValue
 
@@ -95,6 +95,8 @@ module.exports = class Signals
       signal.getNext()?.then (nextSignal) =>
         @update nextSignal
 
+  @latest =
+    fromFunction: _.compose ((a) -> new CurrentSignal a), Signals.fromFunction
 
   ###*
    * This is a each loop that is expecting side effeces
