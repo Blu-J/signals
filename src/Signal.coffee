@@ -271,16 +271,3 @@ module.exports = class Signals
     filterEmpty = Signals.filter (a) -> !_.isEmpty a
 
     filterEmpty backToObject joinedSignal
-
-  ###*
-   * Compose pipelines together
-   * (Signal a -> Signal a`) -> (Signal a` -> Signal a``) -> ... -> (Signal a -> Signal a^n)
-   * @param  {Function} otherSignals... [description]
-   * @return {Function}                 [description]
-  ###
-  @compose = (pipelines...) ->
-    (signal) ->
-      _.reduce pipelines,
-        (newSignal,pipeline) ->
-          pipeline newSignal
-        , signal

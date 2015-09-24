@@ -420,23 +420,6 @@ describe 'With Signal', ->
       peer uberComb firstData
 
 
-  describe 'with compose', ->
-    it "should be able to compose two functions together", ->
-      arrowSum = Signal.foldp ((a, b) -> a + b), 0
-      arrowProduct = Signal.foldp ((a, b) -> a * b), 1
-
-      sumThenProduct = Signal.compose arrowSum, arrowProduct
-
-      input = Signal.fromArray [2, 4]
-      lastAnswer = null
-
-      last = Signal.onValue (value) ->
-        lastAnswer = value
-      last sumThenProduct input
-
-      expect lastAnswer
-        .to.equal 12
-
   describe 'merge with object', ->
     it 'should be able to merge mapping of signals to a signal of out put', ->
       objectGoingIn = {
