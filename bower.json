@@ -12,7 +12,7 @@
     "event",
     "frp"
   ],
-  "license": "MIT",
+  "license": "ISC",
   "ignore": [
     "**/.*",
     "node_modules",
