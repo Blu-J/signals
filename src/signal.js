@@ -128,7 +128,6 @@ export const onValue = _.curry (function (onValue, startingSignal) {
     const isValue =  _.every (values, function(value){
       return !_.find([NONE, NEW_SIGNAL], value);
     });
-    console.log ("Signal.value",JSON.stringify(signal.value));
     if (signal.value == STOP){
       return;
     }
