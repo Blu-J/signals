@@ -1,6 +1,6 @@
 {
   "name": "signals",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Creating a signals, values over time library to consume a callback and array",
   "main": "src/signal.js",
   "directories": {
