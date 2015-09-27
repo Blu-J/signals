@@ -1,6 +1,6 @@
 {
   "name": "signals",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Creating a signals, values over time library to consume a callback and array",
   "main": "src/signal.js",
   "directories": {
@@ -20,7 +20,7 @@
   },
   "scripts": {
     "test": "mocha -w --compilers coffee:coffee-script/register,js:babel/register",
-    "build": "browserify src/signal.js -x lodash -t babelify --outfile dist/signal.js"
+    "build": "browserify src/signal.js -s signal -x lodash -t babelify --outfile dist/signal.js"
   },
   "author": "",
   "license": "ISC"
