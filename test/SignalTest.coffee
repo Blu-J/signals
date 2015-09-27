@@ -6,6 +6,7 @@ _ = require 'lodash'
 
 {expect} = require 'chai'
 global.Promise = Promise
+global._ = _
 
 
 Signal = require '../src/signal'

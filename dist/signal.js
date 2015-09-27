@@ -1,6 +1,5 @@
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.signal = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 /*jshint esnext: true */
-
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -13,13 +12,7 @@ exports.mergeOr = mergeOr;
 exports.mergeAnd = mergeAnd;
 exports.mergeObject = mergeObject;
 
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
-
 function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i]; return arr2; } else { return Array.from(arr); } }
-
-var _lodash = require('lodash');
-
-var _lodash2 = _interopRequireDefault(_lodash);
 
 var NEW_SIGNAL = Symbol('NEW_SIGNAL');
 exports.NEW_SIGNAL = NEW_SIGNAL;
@@ -47,7 +40,7 @@ function Signal(value, getNext) {
   };
 }
 
-var SIGNAL_DEAD = Signal(STOP, _lodash2['default'].noop);
+var SIGNAL_DEAD = Signal(STOP, _.noop);
 function CurrentSignal(tailSignal) {
   var me = {};
   me.tailSignal = tailSignal;
@@ -80,7 +73,7 @@ var getLatest = function getLatest(signalA) {
  * @return {Signal a}       Signal a
 */
 var fromArray = function fromArray(array) {
-  return (0, _lodash2['default'])([NEW_SIGNAL].concat(array)).reverse().reduce(function (head, arrayValue) {
+  return _([NEW_SIGNAL].concat(array)).reverse().reduce(function (head, arrayValue) {
     var newPromise = new Promise(function (resolve) {
       return resolve(head);
     });
@@ -100,7 +93,7 @@ exports.fromArray = fromArray;
 */
 var fromFunction = function fromFunction(sinkNewValue) {
   var initValue = NEW_SIGNAL;
-  var currentResolve = _lodash2['default'].noop;
+  var currentResolve = _.noop;
   var newTail = function newTail(value) {
     var newPromise = new Promise(function (resolve) {
       currentResolve = resolve;
@@ -122,7 +115,7 @@ exports.fromFunction = fromFunction;
  * These are functions that will return a signal that follows the tails, ensuring that the latest is always there.
 */
 var latest = {
-  fromFunction: _lodash2['default'].compose(getLatest, fromFunction)
+  fromFunction: _.compose(getLatest, fromFunction)
 };
 
 exports.latest = latest;
@@ -142,7 +135,7 @@ var fromPromises = function fromPromises() {
     promises[_key] = arguments[_key];
   }
 
-  _lodash2['default'].each(promises, function (promise) {
+  _.each(promises, function (promise) {
     return promise.then(sink);
   });
   return answer;
@@ -170,11 +163,11 @@ function isSignal(predicateValue) {
  * @param  {[type]} startingSignal    Signal a
  * @return {Function}                () -> () | Clean up
 */
-var onValue = _lodash2['default'].curry(function (onValue, startingSignal) {
+var onValue = _.curry(function (onValue, startingSignal) {
   var _withNext = function withNext(signal) {
     var values = [].concat(signal.value);
-    var isValue = _lodash2['default'].every(values, function (value) {
-      return !_lodash2['default'].find([NONE, NEW_SIGNAL], value);
+    var isValue = _.every(values, function (value) {
+      return !_.find([NONE, NEW_SIGNAL], value);
     });
     console.log("Signal.value", JSON.stringify(signal.value));
     if (signal.value == STOP) {
@@ -187,8 +180,8 @@ var onValue = _lodash2['default'].curry(function (onValue, startingSignal) {
   };
   _withNext(startingSignal);
   return function () {
-    onValue = _lodash2['default'].noop;
-    _withNext = _lodash2['default'].noop;
+    onValue = _.noop;
+    _withNext = _.noop;
   };
 });
 
@@ -201,7 +194,7 @@ exports.onValue = onValue;
  * @param  {Signal} signal       Signal a
  * @return {Sginal}              Signal state
 */
-var foldp = _lodash2['default'].curry(function (foldFunction, initialState, signal) {
+var foldp = _.curry(function (foldFunction, initialState, signal) {
   //TODO
   var untilNext = function untilNext(nextSignal) {
     var isSkipValue = nextSignal.value === NEW_SIGNAL || nextSignal.value === NONE;
@@ -230,7 +223,7 @@ exports.foldp = foldp;
  * @param  {Signal} signal      Signal a | Signal of domain
  * @return {Signal}             Signal b | Signal of codomain
 */
-var map = _lodash2['default'].curry(function (mapFunction, signal) {
+var map = _.curry(function (mapFunction, signal) {
   return foldp(function (memo, newValue) {
     return mapFunction(newValue);
   }, null, signal);
@@ -291,7 +284,7 @@ function join(signalA, signalB) {
  * @param  {Signal} signal         Source
  * @return {Signal}                Filtered source
 */
-var filter = _lodash2['default'].curry(function (filterFunction, signal) {
+var filter = _.curry(function (filterFunction, signal) {
   return foldp(function (memo, newValue) {
     return !filterFunction(newValue) ? NONE : newValue;
   }, null, signal);
@@ -310,11 +303,11 @@ function mergeOr() {
     otherSignals[_key2] = arguments[_key2];
   }
 
-  var allValues = _lodash2['default'].map(otherSignals, _lodash2['default'].property('value'));
+  var allValues = _.map(otherSignals, _.property('value'));
   return Signal(allValues, function () {
-    var newPromises = _lodash2['default'].map(otherSignals, function (oldSignal) {
+    var newPromises = _.map(otherSignals, function (oldSignal) {
       return oldSignal.getNext().then(function (newSignal) {
-        var nextSignals = _lodash2['default'].map(otherSignals, function (otherSignal) {
+        var nextSignals = _.map(otherSignals, function (otherSignal) {
           return otherSignal !== oldSignal ? otherSignal : newSignal;
         });
         return mergeOr.apply(undefined, _toConsumableArray(nextSignals));
@@ -336,15 +329,15 @@ function mergeAnd() {
     otherSignals[_key3] = arguments[_key3];
   }
 
-  var allValues = _lodash2['default'].map(otherSignals, _lodash2['default'].property('value'));
-  var otherGetNexts = _lodash2['default'].map(otherSignals, _lodash2['default'].property('getNext'));
-  var allNew = _lodash2['default'].every(allValues, function (value) {
+  var allValues = _.map(otherSignals, _.property('value'));
+  var otherGetNexts = _.map(otherSignals, _.property('getNext'));
+  var allNew = _.every(allValues, function (value) {
     return value === NEW_SIGNAL;
   });
   var maybeNewAllValues = allNew ? NEW_SIGNAL : allValues;
 
   return Signal(allValues, function () {
-    var otherNexts = _lodash2['default'].map(otherGetNexts, function (getNext) {
+    var otherNexts = _.map(otherGetNexts, function (getNext) {
       return getNext();
     });
     return Promise.all(otherNexts).then(function (allNextValues) {
@@ -360,26 +353,26 @@ function mergeAnd() {
 */
 
 function mergeObject(objectToMerge) {
-  var setOfSignals = _lodash2['default'].map(objectToMerge, function (signal, key) {
+  var setOfSignals = _.map(objectToMerge, function (signal, key) {
     return map(function (a) {
       var answer = {};
       answer[key] = a;
       return answer;
     }, signal);
   });
-  var joinedSignal = _lodash2['default'].reduce(_lodash2['default'].rest(setOfSignals), function (joinedSignal, additionalSignal) {
+  var joinedSignal = _.reduce(_.rest(setOfSignals), function (joinedSignal, additionalSignal) {
     return join(joinedSignal, additionalSignal);
-  }, _lodash2['default'].first(setOfSignals));
+  }, _.first(setOfSignals));
   var backToObject = foldp(function (lastAnswer, value) {
-    return _lodash2['default'].extend({}, lastAnswer, value);
+    return _.extend({}, lastAnswer, value);
   }, {});
 
   var filterEmpty = filter(function (a) {
-    return !_lodash2['default'].isEmpty(a);
+    return !_.isEmpty(a);
   });
 
   return filterEmpty(backToObject(joinedSignal));
 }
 
-},{"lodash":"lodash"}]},{},[1])(1)
+},{}]},{},[1])(1)
 });

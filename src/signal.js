@@ -1,7 +1,4 @@
 /*jshint esnext: true */
-
-import _ from 'lodash';
-
 export const NEW_SIGNAL = Symbol ('NEW_SIGNAL');
 export const NONE = Symbol ('NONE');
 export const STOP = Symbol ('STOP');
