@@ -1,0 +1,27 @@
+{
+  "name": "frpSignal",
+  "homepage": "https://github.com/justmiller/signals",
+  "authors": [
+    "Justin Miller<dragondef@gmail.com>"
+  ],
+  "description": "Signal events, combine them and map them as if they are arrays.",
+  "main": "dist/signal.js",
+  "moduleType": [],
+  "keywords": [
+    "signal",
+    "event",
+    "frp"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "lodash": "~3.10.1",
+    "bluebird": "~2.10.1"
+  }
+}

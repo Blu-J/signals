@@ -1,10 +1,16 @@
-Signal = require '../src/Signal'
+require "babel/polyfill"
+
 Promise = require 'bluebird'
 _ = require 'lodash'
 
-{expect} = require 'chai'
 
-describe 'With Signal', ->
+{expect} = require 'chai'
+global.Promise = Promise
+
+
+Signal = require '../src/signal'
+
+describe.only 'With Signal', ->
 
   beforeEach ->
     Promise.setScheduler (fn) ->
