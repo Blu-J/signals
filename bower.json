@@ -20,7 +20,7 @@
     "test",
     "tests"
   ],
-  "dependencies": {
+  "devDependencies": {
     "lodash": "~3.10.1",
     "bluebird": "~2.10.1"
   }

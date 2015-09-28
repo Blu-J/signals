@@ -1,10 +1,12 @@
-/*jshint esnext: true */
-export const NEW_SIGNAL = Symbol ('NEW_SIGNAL');
-export const NONE = Symbol ('NONE');
-export const STOP = Symbol ('STOP');
-export const NO_VALUES = [NEW_SIGNAL, NONE, STOP];
-const noop = () => null;
-
+/* @flow */
+export var NEW_SIGNAL: SignalMessages = Symbol ('NEW_SIGNAL');
+export var NONE: SignalMessages = Symbol ('NONE');
+export var STOP: SignalMessages = Symbol ('STOP');
+export var NO_VALUES: SignalMessages = [NEW_SIGNAL, NONE, STOP];
+var noop = () => null;
+type SignalMessages = any;
+type Signal<A: any> = {value: A | SignalMessages , getNext: () => Promise<Signal<A>>};
+type Promise<A:any> = {then: (resolved: Function) => Promise<any>};
 /**
  * Signal is a value over time, this is just a link to next moment in time. And is lazy
  * a -> (() -> Promise Signal a) -> Signal a
@@ -12,14 +14,14 @@ const noop = () => null;
  * @param  {Function} @getNext [description]
  * @return {Signal}          [description]
 */
-function Signal (value, getNext) {
+function Signal<A:any>(value: A, getNext: () => Promise<Signal<A>>): Signal<A>  {
   return {
     value,
     getNext
   };
 }
 
-const SIGNAL_DEAD = Signal (STOP, _.noop);
+const SIGNAL_DEAD: Signal = Signal (STOP, _.noop);
 function CurrentSignal (tailSignal) {
   const me = {};
   me.tailSignal = tailSignal;
@@ -109,7 +111,7 @@ export const fromPromises = function(...promises) {
  * @return {[type]}                [description]
 */
 export function isSignal (predicateValue) {
-  const hasValue = predicateValue.hasOwnProperty('value');
+  const hasValue = predicateValue && predicateValue.hasOwnProperty('value');
   const hasGetNext = predicateValue ? typeof predicateValue.getNext === 'function' : false;
   return hasValue && hasGetNext;
 }
