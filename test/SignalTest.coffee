@@ -1,6 +1,6 @@
 require "babel/polyfill"
 
-Promise = require 'bluebird'
+Promise = require 'promise-polyfill'
 _ = require 'lodash'
 
 
@@ -14,7 +14,7 @@ Signal = require '../src/signal'
 describe.only 'With Signal', ->
 
   beforeEach ->
-    Promise.setScheduler (fn) ->
+    Promise._setImmediateFn (fn) ->
       fn()
 
   it 'constructor', ->
@@ -53,7 +53,7 @@ describe.only 'With Signal', ->
         newValue = ''
         sinker = null
         ANSWER = 'test'
-        mainSignal = Signal.latest.fromFunction (sink) ->
+        mainSignal = Signal.fromFunction (sink) ->
           sinker = sink
         sinker ANSWER
         Signal.onValue (mainSignalValue) ->
@@ -69,7 +69,7 @@ describe.only 'With Signal', ->
         wrongAnswer = 'firstWrongAnswer'
         wrongAnswer2 = 'second WrongAnswer'
         ANSWER = 'test'
-        mainSignal = Signal.latest.fromFunction (sink) ->
+        mainSignal = Signal.fromFunction (sink) ->
           sinker = sink
 
         sinker wrongAnswer
@@ -90,7 +90,7 @@ describe.only 'With Signal', ->
         answerPartOne = 'part1'
         answerPartTwo = 'part2'
         answer = answerPartOne + answerPartTwo
-        mainSignal = Signal.latest.fromFunction (sink) ->
+        mainSignal = Signal.fromFunction (sink) ->
           sinker = sink
 
         sinker wrongAnswer
@@ -443,4 +443,22 @@ describe.only 'With Signal', ->
       appendAnswers signalReturned
 
       expect answersReturned
-        .to.deep.equal [{signalA:1}, {signalA: 1, signalB: 'a'}, {signalA:2, signalB : 'a'}, {signalA:2,signalB:'b'}]
+        .to.deep.equal [{signalA:1},{signalA:2},{signalA:2, signalB : 'a'}, {signalA:2,signalB:'b'}]
+
+
+    it 'should be able to merge mapping of signals to a signal of out put of latest', ->
+      objectGoingIn = {
+        signalA : Signal.getLatest(Signal.fromArray [1,2])
+        signalB : Signal.getLatest(Signal.fromArray 'ab'.split '')
+      }
+
+      signalReturned = Signal.mergeObject objectGoingIn
+
+      answersReturned = []
+      appendAnswers = Signal.onValue (a) ->
+        answersReturned.push a
+
+      appendAnswers signalReturned
+
+      expect answersReturned
+        .to.deep.equal [{signalA:2},{signalA:2,signalB:'b'}]

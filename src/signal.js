@@ -6,7 +6,6 @@ export var NO_VALUES: SignalMessages = [NEW_SIGNAL, NONE, STOP];
 var noop = () => null;
 type SignalMessages = any;
 type Signal<A: any> = {value: A | SignalMessages , getNext: () => Promise<Signal<A>>};
-type Promise<A:any> = {then: (resolved: Function) => Promise<any>};
 /**
  * Signal is a value over time, this is just a link to next moment in time. And is lazy
  * a -> (() -> Promise Signal a) -> Signal a
@@ -25,13 +24,16 @@ const SIGNAL_DEAD: Signal = Signal (STOP, _.noop);
 function CurrentSignal (tailSignal) {
   const me = {};
   me.tailSignal = tailSignal;
-  update (tailSignal);
-  me.getNext = () => me.tailSignal.getNext();
+  me.value = NEW_SIGNAL;
+  update(tailSignal);
+  me.getNext = () => Promise.resolve (me.tailSignal);
   return me;
 
 
   function update (signal) {
-    me.value = signal.value;
+    if(signal.value === STOP){
+      return;
+    }
     me.tailSignal = signal;
     const next = signal.getNext();
     if (next){
@@ -40,7 +42,6 @@ function CurrentSignal (tailSignal) {
   }
 }
 
-const getLatest = (signalA) => CurrentSignal (signalA);
 
 
 
@@ -60,15 +61,14 @@ export const fromArray = function (array) {
   .valueOf();
 };
 
-
 /**
  * create a signal from a function that can 'sink' values in
  * Note that this could be a memory leak
- * ((a -> ()) -> ()) -> CurrentSignal a
+ * ((a -> ()) -> ()) -> Signal a
  * @param  {Function} sinkNewValue (a -> ()) -> () | A function to drop a new value
- * @return {Signal}              CurrentSignal a | A current signal of a
+ * @return {Signal}              Signal a
 */
-export const fromFunction = function (sinkNewValue){
+export const fastForwardFunction = function (sinkNewValue){
   const initValue = NEW_SIGNAL;
   let currentResolve = _.noop;
   const newTail = function (value) {
@@ -83,13 +83,19 @@ export const fromFunction = function (sinkNewValue){
   return answer;
 };
 
-
 /**
- * These are functions that will return a signal that follows the tails, ensuring that the latest is always there.
+ * create a signal from a function that can 'sink' values in
+ * Note that this could be a memory leak
+ * ((a -> ()) -> ()) -> CurrentSignal a
+ * @param  {Function} sinkNewValue (a -> ()) -> () | A function to drop a new value
+ * @return {Signal}              CurrentSignal a | A current signal of a
 */
-export const latest ={
-  fromFunction: _.compose (getLatest, fromFunction)
+export const fromFunction = function (sinkNewValue){
+  return CurrentSignal(fastForwardFunction(sinkNewValue));
 };
+
+
+
 
 /**
  * From Promises
@@ -229,7 +235,6 @@ export function join (signalA, signalB){
       promiseRight.then (getNextSignal (promiseLeft))
     ]);
   };
-
   return Signal (signalA.value, () =>
     nextSignal (signalA.getNext(), signalB.getNext()));
 }
@@ -310,3 +315,15 @@ export function mergeObject (objectToMerge) {
 
   return filterEmpty (backToObject (joinedSignal));
 }
+
+
+export const getLatest = (signalA) => CurrentSignal (signalA);
+
+/**
+ * These are functions that will return a signal that follows the tails, ensuring that the latest is always there.
+*/
+export const latest ={
+  mergeObject:  _.compose (getLatest, mergeObject),
+  mergeAnd:  _.compose (getLatest, mergeAnd),
+  mergeOr:  _.compose (getLatest, mergeOr),
+};
