@@ -5,7 +5,7 @@ export var STOP: SignalMessages = Symbol ('STOP');
 export var NO_VALUES: SignalMessages = [NEW_SIGNAL, NONE, STOP];
 var noop = () => null;
 type SignalMessages = any;
-type Signal<A: any> = {value: A | SignalMessages , getNext: () => Promise<Signal<A>>};
+type SignalType<A: any> = {value: A | SignalMessages , getNext: () => Promise<Signal<A>>};
 /**
  * Signal is a value over time, this is just a link to next moment in time. And is lazy
  * a -> (() -> Promise Signal a) -> Signal a
@@ -13,7 +13,7 @@ type Signal<A: any> = {value: A | SignalMessages , getNext: () => Promise<Signal
  * @param  {Function} @getNext [description]
  * @return {Signal}          [description]
 */
-function Signal<A:any>(value: A, getNext: () => Promise<Signal<A>>): Signal<A>  {
+function Signal<A:any>(value: A, getNext: () => Promise<Signal<A>>): SignalType<A>  {
   return {
     value,
     getNext
@@ -31,7 +31,7 @@ function CurrentSignal (tailSignal) {
 
 
   function update (signal) {
-    if(signal.value === STOP){
+    if(signal.value === STOP || !signal.getNext){
       return;
     }
     me.tailSignal = signal;
