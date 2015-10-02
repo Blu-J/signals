@@ -1273,10 +1273,12 @@ var STOP = _Symbol('STOP');
 exports.STOP = STOP;
 var NO_VALUES = [NEW_SIGNAL, NONE, STOP];
 exports.NO_VALUES = NO_VALUES;
-var noop = function noop() {
-  return null;
-};
-
+function CreateResolvedPromise(a) {
+  return new _Promise(function (resolve) {
+    return resolve(a);
+  });
+}
+var noop = _.noop;
 /**
  * Signal is a value over time, this is just a link to next moment in time. And is lazy
  * a -> (() -> Promise Signal a) -> Signal a
@@ -1291,19 +1293,19 @@ function Signal(value, getNext) {
   };
 }
 
-var SIGNAL_DEAD = Signal(STOP, _.noop);
+var SIGNAL_DEAD = Signal(STOP, noop);
 function CurrentSignal(tailSignal) {
   var me = {};
   me.tailSignal = tailSignal;
   me.value = NEW_SIGNAL;
   update(tailSignal);
   me.getNext = function () {
-    return _Promise.resolve(me.tailSignal);
+    return CreateResolvedPromise(me.tailSignal);
   };
   return me;
 
   function update(signal) {
-    if (signal.value === STOP) {
+    if (signal.value === STOP || !signal.getNext) {
       return;
     }
     me.tailSignal = signal;
@@ -1323,10 +1325,11 @@ function CurrentSignal(tailSignal) {
  * @return {Signal a}       Signal a
 */
 var fromArray = function fromArray(array) {
-  return _([NEW_SIGNAL].concat(array)).reverse().reduce(function (head, arrayValue) {
-    var newPromise = new _Promise(function (resolve) {
-      return resolve(head);
-    });
+  return _.chain([NEW_SIGNAL].concat(array)).reverse().reduce(function (head, arrayValue) {
+    var resolveWithHead = function resolveWithHead(resolve) {
+      resolve(head);
+    };
+    var newPromise = new _Promise(resolveWithHead);
     return Signal(arrayValue, function () {
       return newPromise;
     });
@@ -1380,10 +1383,11 @@ exports.fromFunction = fromFunction;
  * @return {Signal}             [description]
 */
 var fromPromises = function fromPromises() {
-  var sink = null;
-  var answer = fromFunction(function (newSink) {
+  var sink = undefined;
+  var assignSink = function assignSink(newSink) {
     return sink = newSink;
-  });
+  };
+  var answer = fromFunction(assignSink);
 
   for (var _len = arguments.length, promises = Array(_len), _key = 0; _key < _len; _key++) {
     promises[_key] = arguments[_key];
@@ -1521,8 +1525,14 @@ function join(signalA, signalB) {
         });
       };
     };
-
-    return _Promise.race([promiseLeft.then(getNextSignal(promiseRight)), promiseRight.then(getNextSignal(promiseLeft))]);
+    var race = function race(promises) {
+      return new _Promise(function (resolve) {
+        return _.each(promises, function (promise) {
+          return promise.then(resolve);
+        });
+      });
+    };
+    return race([promiseLeft.then(getNextSignal(promiseRight)), promiseRight.then(getNextSignal(promiseLeft))]);
   };
   return Signal(signalA.value, function () {
     return nextSignal(signalA.getNext(), signalB.getNext());
@@ -1605,13 +1615,14 @@ function mergeAnd() {
 */
 
 function mergeObject(objectToMerge) {
-  var setOfSignals = _.map(objectToMerge, function (signal, key) {
+  var keyPairToArraySignals = function keyPairToArraySignals(signal, key) {
     return map(function (a) {
       var answer = {};
       answer[key] = a;
       return answer;
     }, signal);
-  });
+  };
+  var setOfSignals = _.map(objectToMerge, keyPairToArraySignals);
   var joinedSignal = _.reduce(_.rest(setOfSignals), function (joinedSignal, additionalSignal) {
     return join(joinedSignal, additionalSignal);
   }, _.first(setOfSignals));
