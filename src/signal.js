@@ -3,7 +3,7 @@ type curry3<A,B,C,D> = (func:(a:A,b:B,c:C) => D, arity?:number) => (((a:A) => (b
 type Signal<A> =
 {
   value:(A | Symbol);
-  getNext: Function;
+  getNext: () => Promise<any>;
 };
 declare class LoDashWrapped<A> {
   map<B>(fn:(a:A) => B): LoDashWrapped<B>;
