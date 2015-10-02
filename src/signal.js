@@ -1,5 +1,10 @@
 /* @flow */
 type curry3<A,B,C,D> = (func:(a:A,b:B,c:C) => D, arity?:number) => (((a:A) => (b:B) => (c:C) => D) | ((a:A) => (b:B,c:C) => D) | (a:A,b:B,c:C) => D);
+type Signal<A> =
+{
+  value:(A | Symbol);
+  getNext: Function;
+};
 declare class LoDashWrapped<A> {
   map<B>(fn:(a:A) => B): LoDashWrapped<B>;
   valueOf(): A;
@@ -42,14 +47,14 @@ const noop: Function = _.noop;
  * @param  {Function} @getNext [description]
  * @return {Signal}          [description]
 */
-function Signal<A:any>(value: A, getNext: () => Promise<Signal<A>>):Signal{
+function SignalFactory<A>(value: A, getNext: () => Promise<Signal<A>>):Signal<A>{
   return {
     value,
     getNext
   };
 }
 
-const SIGNAL_DEAD: Signal = Signal (STOP, noop);
+const SIGNAL_DEAD: Signal = SignalFactory (STOP, noop);
 function CurrentSignal<A>(tailSignal: Signal<A>):Signal<A> {
   const me = {};
   me.tailSignal = tailSignal;
@@ -80,7 +85,7 @@ function CurrentSignal<A>(tailSignal: Signal<A>):Signal<A> {
  * @param  {Array a} array [a...] | Value of a
  * @return {Signal a}       Signal a
 */
-export const fromArray = function<A:any> (array : Array<A>): Signal<A> {
+export const fromArray = function<A> (array : Array<A>): Signal<A> {
   return _.chain([NEW_SIGNAL].concat(array))
   .reverse()
   .reduce (function (head, arrayValue) {
@@ -88,7 +93,7 @@ export const fromArray = function<A:any> (array : Array<A>): Signal<A> {
       resolve(head)
     };
     const newPromise = new Promise(resolveWithHead);
-    return Signal (arrayValue, () => newPromise);
+    return SignalFactory (arrayValue, () => newPromise);
   }, SIGNAL_DEAD)
   .valueOf();
 };
@@ -107,7 +112,7 @@ export const fastForwardFunction = function <A>(sinkNewValue: (sink:(a:A) => any
     const newPromise = new Promise (function(resolve: (newSignal:Signal)=> void) {
       currentResolve = resolve;
     });
-    return Signal (value, () => newPromise);
+    return SignalFactory (value, () => newPromise);
   };
 
   const answer = newTail (initValue);
@@ -212,7 +217,7 @@ export const foldp = _.curry(function <A,B>(foldFunction: (b:B,a:A)=>B , initial
       SIGNAL_DEAD :
       foldp (foldFunction, nextValue, nextSignal);
   };
-  return Signal (initialState, () => signal.getNext().then(untilNext));
+  return SignalFactory (initialState, () => signal.getNext().then(untilNext));
 });
 
 /**
@@ -242,7 +247,7 @@ export function flatten<A> (signal: Signal<(Signal<A> | A)>):Signal<A>{
   const isEnd = !signal || signal.value == STOP;
   return isEnd ?
     signal :
-    Signal (signal.value, () =>
+    SignalFactory (signal.value, () =>
       signal.getNext().then(withNext));
 }
 
@@ -253,25 +258,30 @@ export function flatten<A> (signal: Signal<(Signal<A> | A)>):Signal<A>{
  * @param  {Signal} signalB [description]
  * @return {Signal}         [description]
  */
-export function join <A,B>(signalA:Signal<A>, signalB:Signal<B>): Signal<A|B>{
+export function join <A>(signalA:Signal<A>, signalB:Signal<A>): Signal<A>{
   if (!signalA || signalA.value == STOP){
     return signalB;
   }
-  const nextSignal: <A>(left: Promise<Signal<A>>,right:Promise<Signal<A>>) => Promise<Signal<A>> = function (promiseLeft, promiseRight):Signal {
+  const nextSignal: (left: Promise<Signal<A>>,right:Promise<Signal<A>>) => Promise<Signal<A>> = function (promiseLeft, promiseRight):Promise {
     const getNextSignal = (otherPromise) => (newSignal) =>
       !newSignal || newSignal.value === STOP ?
         otherPromise :
-        Signal (newSignal.value, () =>
+        SignalFactory (newSignal.value, () =>
           nextSignal (newSignal.getNext(), otherPromise));
-    const race = (promises) =>
-      new Promise((resolve) =>
-        _.each(promises, (promise) => promise.then(resolve)));
+    const signalOrEnd:(a:any) => Signal = (potentialSignal) =>
+      isSignal(potentialSignal) ? potentialSignal : SIGNAL_DEAD;
+
+    const race = function(promises):Promise {
+      return new Promise(function(resolve){
+        _.each(promises, (promise) => promise.then((potentialValue)=>resolve(potentialValue)))
+      });
+    };
     return race([
       promiseLeft.then (getNextSignal (promiseRight)),
       promiseRight.then (getNextSignal (promiseLeft))
     ]);
   };
-  return Signal (signalA.value, () =>
+  return SignalFactory (signalA.value, () =>
     nextSignal (signalA.getNext(), signalB.getNext()));
 }
 
@@ -292,9 +302,9 @@ export var filter = _.curry((filterFunction, signal) =>
  * @param  {Signal[]} other.. Other Streams
  * @return {Signal}                 Signal of [streamValues...]
 */
-export function mergeOr <A>(...otherSignals: Array<Signal<A>>):Signal<A> {
+export function mergeOr <A>(...otherSignals: Array<Signal<A>>):Signal<Array<A>> {
   const allValues = _.map(otherSignals, _.property('value'));
-  return Signal (allValues, function(){
+  return SignalFactory (allValues, function(){
     const newPromises = _.map(otherSignals, (oldSignal) =>
       oldSignal.getNext().then (function (newSignal) {
         const nextSignals = _.map (otherSignals, (otherSignal) =>
@@ -313,15 +323,15 @@ export function mergeOr <A>(...otherSignals: Array<Signal<A>>):Signal<A> {
  * @param  {Signal []} other.. [description]
  * @return {Signal}                 [description]
 */
-export function mergeAnd (...otherSignals : Array<Signal>) : Signal {
-  const allValues = _.map (otherSignals, _.property ('value'));
+export function mergeAnd <A>(...otherSignals : Array<Signal<A>>) : Signal<Array<A>> {
+  const allValues: Array<(A|Symbol)> = _.map (otherSignals, _.property ('value'));
   const otherGetNexts:Array<()=>Promise<Signal>> = _.map (otherSignals, _.property ('getNext'));
   const allNew = _.every( allValues, (value) => value === NEW_SIGNAL);
   const maybeNewAllValues =  allNew ?
     NEW_SIGNAL :
     allValues;
 
-  return Signal (allValues, function(){
+  return SignalFactory (allValues, function(){
     const otherNexts = _.map (otherGetNexts, (getNext) => getNext());
     return Promise.all (otherNexts)
       .then ((allNextValues) =>
