@@ -1,11 +1,40 @@
 /* @flow */
-export var NEW_SIGNAL: SignalMessages = Symbol ('NEW_SIGNAL');
-export var NONE: SignalMessages = Symbol ('NONE');
-export var STOP: SignalMessages = Symbol ('STOP');
-export var NO_VALUES: SignalMessages = [NEW_SIGNAL, NONE, STOP];
-var noop = () => null;
-type SignalMessages = any;
-type SignalType<A: any> = {value: A | SignalMessages , getNext: () => Promise<Signal<A>>};
+type curry3<A,B,C,D> = (func:(a:A,b:B,c:C) => D, arity?:number) => (((a:A) => (b:B) => (c:C) => D) | ((a:A) => (b:B,c:C) => D) | (a:A,b:B,c:C) => D);
+declare class LoDashWrapped<A> {
+  map<B>(fn:(a:A) => B): LoDashWrapped<B>;
+  valueOf(): A;
+  reduce<B>(fn: (b:B,a:A) => B, initial:B): LoDashWrapped<B>;
+  reverse(): LoDashWrapped<A>;
+}
+
+declare class LoDashObj {
+  chain<A>(a:Array<A>): LoDashWrapped<A>;
+  compose<A>(_:any) : Function;
+  curry:curry3;
+  each<A>(values:Array<A>,onEach:(a:A)=>any): void;
+  every<A>(values:Array<A>, predicateTest:(a:A) => boolean): boolean;
+  extend(...objects:Array<Object>):Object;
+  first<A>(values:Array<A>):A;
+  find<A>(values:Array<A>, haveFound:(a:A) => boolean): A;
+  isEmpty(object:Object):boolean;
+  map<A,B>(values:Array<A>, mapFunction: (a:A,index?:number) => B): Array<B>;
+  map<A,B>(valueObject:{[key:string]: A}, mapFunction: Function): Array<B>;
+  noop():void;
+  property(a:string):(obj:any)=>any;
+  reduce<A,B>(values: Array<A>,fn: (b:B,a:A) => B, initial:B): Array<B>;
+  rest<A>(values:Array<A>):Array<A>;
+}
+declare var _: LoDashObj;
+
+
+export const NEW_SIGNAL = Symbol ('NEW_SIGNAL');
+export const NONE = Symbol ('NONE');
+export const STOP = Symbol ('STOP');
+export const NO_VALUES: Array<Symbol> = [NEW_SIGNAL, NONE, STOP];
+function CreateResolvedPromise<A>(a:A):Promise<A> {
+  return new Promise((resolve) => resolve(a));
+}
+const noop: Function = _.noop;
 /**
  * Signal is a value over time, this is just a link to next moment in time. And is lazy
  * a -> (() -> Promise Signal a) -> Signal a
@@ -13,20 +42,20 @@ type SignalType<A: any> = {value: A | SignalMessages , getNext: () => Promise<Si
  * @param  {Function} @getNext [description]
  * @return {Signal}          [description]
 */
-function Signal<A:any>(value: A, getNext: () => Promise<Signal<A>>): SignalType<A>  {
+function Signal<A:any>(value: A, getNext: () => Promise<Signal<A>>):Signal{
   return {
     value,
     getNext
   };
 }
 
-const SIGNAL_DEAD: Signal = Signal (STOP, _.noop);
-function CurrentSignal (tailSignal) {
+const SIGNAL_DEAD: Signal = Signal (STOP, noop);
+function CurrentSignal<A>(tailSignal: Signal<A>):Signal<A> {
   const me = {};
   me.tailSignal = tailSignal;
   me.value = NEW_SIGNAL;
   update(tailSignal);
-  me.getNext = () => Promise.resolve (me.tailSignal);
+  me.getNext = () => CreateResolvedPromise (me.tailSignal);
   return me;
 
 
@@ -51,11 +80,14 @@ function CurrentSignal (tailSignal) {
  * @param  {Array a} array [a...] | Value of a
  * @return {Signal a}       Signal a
 */
-export const fromArray = function (array) {
-  return _([NEW_SIGNAL].concat(array))
+export const fromArray = function<A:any> (array : Array<A>): Signal<A> {
+  return _.chain([NEW_SIGNAL].concat(array))
   .reverse()
   .reduce (function (head, arrayValue) {
-    const newPromise = new Promise((resolve) => resolve (head));
+    const resolveWithHead = function(resolve) {
+      resolve(head)
+    };
+    const newPromise = new Promise(resolveWithHead);
     return Signal (arrayValue, () => newPromise);
   }, SIGNAL_DEAD)
   .valueOf();
@@ -68,11 +100,11 @@ export const fromArray = function (array) {
  * @param  {Function} sinkNewValue (a -> ()) -> () | A function to drop a new value
  * @return {Signal}              Signal a
 */
-export const fastForwardFunction = function (sinkNewValue){
+export const fastForwardFunction = function <A>(sinkNewValue: (sink:(a:A) => any) => any) : Signal<A>{
   const initValue = NEW_SIGNAL;
-  let currentResolve = _.noop;
+  let currentResolve:Function = _.noop;
   const newTail = function (value) {
-    const newPromise = new Promise (function(resolve) {
+    const newPromise = new Promise (function(resolve: (newSignal:Signal)=> void) {
       currentResolve = resolve;
     });
     return Signal (value, () => newPromise);
@@ -90,7 +122,7 @@ export const fastForwardFunction = function (sinkNewValue){
  * @param  {Function} sinkNewValue (a -> ()) -> () | A function to drop a new value
  * @return {Signal}              CurrentSignal a | A current signal of a
 */
-export const fromFunction = function (sinkNewValue){
+export const fromFunction = function <A>(sinkNewValue: (sink:(a:A)=>any) => any) : Signal<A>{
   return CurrentSignal(fastForwardFunction(sinkNewValue));
 };
 
@@ -103,10 +135,11 @@ export const fromFunction = function (sinkNewValue){
  * @param  {Promise} promises... [description]
  * @return {Signal}             [description]
 */
-export const fromPromises = function(...promises) {
-  let sink = null;
-  const answer = fromFunction ((newSink) => sink = newSink);
-  _.each(promises,(promise) => promise.then (sink));
+export const fromPromises = function<A>(...promises : Array<Promise<A>>): Signal<A> {
+  let sink;
+  const assignSink = (newSink) => sink = newSink;
+  const answer: Signal<A> = fromFunction(assignSink);
+  _.each(promises,(promise: Promise) => promise.then(sink));
   return answer;
 };
 
@@ -116,7 +149,7 @@ export const fromPromises = function(...promises) {
  * @param  {[type]} predicateValue [description]
  * @return {[type]}                [description]
 */
-export function isSignal (predicateValue) {
+export function isSignal (predicateValue: Signal | any): boolean {
   const hasValue = predicateValue && predicateValue.hasOwnProperty('value');
   const hasGetNext = predicateValue ? typeof predicateValue.getNext === 'function' : false;
   return hasValue && hasGetNext;
@@ -159,7 +192,7 @@ export const onValue = _.curry (function (onValue, startingSignal) {
  * @param  {Signal} signal       Signal a
  * @return {Sginal}              Signal state
 */
-export const foldp = _.curry (function (foldFunction, initialState, signal){
+export const foldp = _.curry(function <A,B>(foldFunction: (b:B,a:A)=>B , initialState: B, signal: Signal<A>): Signal<B>{
   //TODO
   const untilNext = function (nextSignal){
     const isSkipValue = nextSignal.value === NEW_SIGNAL || nextSignal.value === NONE;
@@ -199,7 +232,8 @@ export const map = _.curry ((mapFunction, signal) =>
  * @param  {[type]} signal [description]
  * @return {[type]}        [description]
 */
-export function flatten (signal){
+
+export function flatten<A> (signal: Signal<(Signal<A> | A)>):Signal<A>{
   const withNext = (nextSignal) =>
     flatten ( isSignal (nextSignal.value) ?
               join (nextSignal.value, nextSignal) :
@@ -219,18 +253,20 @@ export function flatten (signal){
  * @param  {Signal} signalB [description]
  * @return {Signal}         [description]
  */
-export function join (signalA, signalB){
+export function join <A,B>(signalA:Signal<A>, signalB:Signal<B>): Signal<A|B>{
   if (!signalA || signalA.value == STOP){
     return signalB;
   }
-  const nextSignal = function (promiseLeft, promiseRight) {
+  const nextSignal: <A>(left: Promise<Signal<A>>,right:Promise<Signal<A>>) => Promise<Signal<A>> = function (promiseLeft, promiseRight):Signal {
     const getNextSignal = (otherPromise) => (newSignal) =>
       !newSignal || newSignal.value === STOP ?
         otherPromise :
         Signal (newSignal.value, () =>
           nextSignal (newSignal.getNext(), otherPromise));
-
-    return Promise.race ([
+    const race = (promises) =>
+      new Promise((resolve) =>
+        _.each(promises, (promise) => promise.then(resolve)));
+    return race([
       promiseLeft.then (getNextSignal (promiseRight)),
       promiseRight.then (getNextSignal (promiseLeft))
     ]);
@@ -256,7 +292,7 @@ export var filter = _.curry((filterFunction, signal) =>
  * @param  {Signal[]} other.. Other Streams
  * @return {Signal}                 Signal of [streamValues...]
 */
-export function mergeOr (...otherSignals) {
+export function mergeOr <A>(...otherSignals: Array<Signal<A>>):Signal<A> {
   const allValues = _.map(otherSignals, _.property('value'));
   return Signal (allValues, function(){
     const newPromises = _.map(otherSignals, (oldSignal) =>
@@ -277,9 +313,9 @@ export function mergeOr (...otherSignals) {
  * @param  {Signal []} other.. [description]
  * @return {Signal}                 [description]
 */
-export function mergeAnd (...otherSignals) {
+export function mergeAnd (...otherSignals : Array<Signal>) : Signal {
   const allValues = _.map (otherSignals, _.property ('value'));
-  const otherGetNexts = _.map (otherSignals, _.property ('getNext'));
+  const otherGetNexts:Array<()=>Promise<Signal>> = _.map (otherSignals, _.property ('getNext'));
   const allNew = _.every( allValues, (value) => value === NEW_SIGNAL);
   const maybeNewAllValues =  allNew ?
     NEW_SIGNAL :
@@ -297,13 +333,14 @@ export function mergeAnd (...otherSignals) {
  * @param  {[type]} objectToMerge [description]
  * @return {[type]}               [description]
 */
-export function mergeObject (objectToMerge) {
-  const setOfSignals = _.map (objectToMerge, (signal, key) =>
+export function mergeObject <A>(objectToMerge: {[key:string]:Signal<A>}):Signal<A> {
+  const keyPairToArraySignals = (signal:Signal, key:string) =>
     map (function (a) {
       let answer = {};
       answer[key] = a;
       return answer;
-    }, signal));
+    }, signal)
+  const setOfSignals: Array<Signal> = _.map (objectToMerge, keyPairToArraySignals);
   const joinedSignal = _.reduce( _.rest(setOfSignals), (joinedSignal,additionalSignal) =>
     join(joinedSignal, additionalSignal),
     _.first(setOfSignals));
@@ -317,7 +354,7 @@ export function mergeObject (objectToMerge) {
 }
 
 
-export const getLatest = (signalA) => CurrentSignal (signalA);
+export const getLatest = (signalA:Signal):Signal => CurrentSignal (signalA) ;
 
 /**
  * These are functions that will return a signal that follows the tails, ensuring that the latest is always there.
