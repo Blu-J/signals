@@ -1,19 +1,20 @@
 /* @flow */
-
-import * as Signal from '../src/signal';
-import _ from 'lodash';
 declare var describe: Function;
 declare var it: Function;
 declare var expect: Function;
 declare var beforeEach: Function;
 
-Promise = require('promise-polyfill');
+
 
 var expect = require('chai').expect;
 
-global.Promise = Promise;
 
+
+import * as _ from 'lodash';
+Promise = require('promise-polyfill');
+global.Promise = Promise;
 global._ = _;
+const Signal = require('../src/signal');
 
 describe('With Signal', function() {
   beforeEach(function() {
