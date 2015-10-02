@@ -1,5 +1,7 @@
-/* @flow weak */
-var Signal, _, expect;
+/* @flow */
+
+import * as Signal from '../src/signal';
+import _ from 'lodash';
 declare var describe: Function;
 declare var it: Function;
 declare var expect: Function;
@@ -7,15 +9,11 @@ declare var beforeEach: Function;
 
 Promise = require('promise-polyfill');
 
-_ = require('lodash');
-
-expect = require('chai').expect;
+var expect = require('chai').expect;
 
 global.Promise = Promise;
 
 global._ = _;
-
-Signal = require('../src/signal');
 
 describe('With Signal', function() {
   beforeEach(function() {
@@ -26,14 +24,13 @@ describe('With Signal', function() {
     }
   });
   it('constructor', function() {
-    var test;
-    test = Signal.fromFunction(function() {});
+    var test = Signal.fromFunction(function() {});
     return expect(test).not.to.be.undefined;
   });
   it('constructor adds a function sinkValue to function passed in constructor', function() {
-    var sinker, test;
+    var sinker:?Function, test;
     sinker = null;
-    test = Signal.fromFunction(function(newSinker) {
+    Signal.fromFunction(function(newSinker) {
       return sinker = newSinker;
     });
     return expect(_.isFunction(sinker)).to.be["true"];
@@ -158,8 +155,7 @@ describe('With Signal', function() {
      * @param  {Signal} signal [description]
      * @return {Function}        [description]
      */
-    var latestStrConcat;
-    latestStrConcat = function(signal) {
+    var latestStrConcat = function(signal) {
       var answer;
       answer = '';
       Signal.onValue(function(value) {
@@ -186,24 +182,22 @@ describe('With Signal', function() {
       return it('should return in order the values sunk', function() {});
     });
     return describe('from promises', function() {
-      var tupleLazyPromise;
-      tupleLazyPromise = function() {
-        var resolver;
-        resolver = null;
+      var tupleLazyPromise = tupleLazyPromise = function() {
+        var resolver:?Function = null;
         return [
           new Promise(function(resolve) {
-            return resolver = resolve;
-          }), resolver
+            resolver = resolve;
+          }), resolver || _.noop
         ];
       };
       it('shoud take a promise a + b, with resolve order b a, then value of signal should be b a', function() {
-        var answer, answerPartA, answerPartB, expectedAnswer, pairA, pairB;
+        var answerPartA, answerPartB, expectedAnswer;
         answerPartA = 'a';
         answerPartB = 'b';
         expectedAnswer = answerPartB + answerPartA;
-        pairA = tupleLazyPromise();
-        pairB = tupleLazyPromise();
-        answer = latestStrConcat(Signal.fromPromises(pairA[0], pairB[0]));
+        const pairA = tupleLazyPromise();
+        const pairB = tupleLazyPromise();
+        const answer = latestStrConcat(Signal.fromPromises(pairA[0], pairB[0]));
         pairB[1](answerPartB);
         pairA[1](answerPartA);
         return expect(answer()).to.equal(expectedAnswer);
@@ -383,8 +377,8 @@ describe('With Signal', function() {
   });
   describe('with filter', function() {
     return it('should filter values not deeamed correct', function() {
-      var filterEvens, peer, signal, sinker, values;
-      values = [];
+      var filterEvens, peer, signal, sinker;
+      var values = [];
       sinker = null;
       signal = Signal.fromArray([1, 2, 3, 4, 5]);
       filterEvens = Signal.filter(function(value) {
@@ -399,8 +393,8 @@ describe('With Signal', function() {
   });
   describe('with map', function() {
     return it('should transform data coming in', function() {
-      var double, peer, signal, sinker, values;
-      values = [];
+      var double, peer, signal, sinker;
+      var values = [];
       sinker = null;
       signal = Signal.fromArray([1, 2, 3, 4, 5]);
       double = Signal.map(function(value) {
@@ -415,11 +409,11 @@ describe('With Signal', function() {
   });
   describe('with flatten mapping', function() {
     it('should be able to join', function() {
-      var answer, expectedAnswer, peep, sink1, sink2;
+      var expectedAnswer, peep, sink1, sink2;
       expectedAnswer = [1, 2, 3, 4];
       sink1 = _.noop;
       sink2 = _.noop;
-      answer = [];
+      var answer = [];
       peep = Signal.onValue(function(value) {
         return answer.push(value);
       });
@@ -435,9 +429,9 @@ describe('With Signal', function() {
       return expect(answer).to.deep.equal(expectedAnswer);
     });
     it('should be able to join with stops', function() {
-      var answer, expectedAnswer, peep;
+      var expectedAnswer, peep;
       expectedAnswer = [1, 2, 3, 4];
-      answer = [];
+      var answer = [];
       peep = Signal.onValue(function(value) {
         return answer.push(value);
       });
@@ -464,34 +458,32 @@ describe('With Signal', function() {
       return expect(lastSeen).to.deep.equal([['a', '1'], ['a', '2'], ['b', '1'], ['b', '2']]);
     });
     return it.skip('should be able to big combination', function() {
-      var alphabet, combinationSet, createSubSignal, firstData, lastSeen, mapProduct, peer, uberComb;
-      alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
-      firstData = new Signal.fromArray(alphabet);
-      lastSeen = null;
-      createSubSignal = function(firstPart) {
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+      const firstData = new Signal.fromArray(alphabet);
+      let lastSeen = null;
+      const createSubSignal = function(firstPart) {
         return Signal.fromArray(_.map(alphabet, function(b) {
           return firstPart + b;
         }));
       };
-      mapProduct = Signal.map(createSubSignal);
-      peer = Signal.onValue(function(value) {
+      const mapProduct = Signal.map(createSubSignal);
+      const peer = Signal.onValue(function(value) {
         return console.log("A Value: " + value);
       });
-      combinationSet = Signal.compose(mapProduct, Signal.flatten);
-      uberComb = Signal.compose(combinationSet);
+      const combinationSet = _.compose(Signal.flatten,mapProduct);
+      const uberComb = _.compose(combinationSet);
       return peer(uberComb(firstData));
     });
   });
   return describe('merge with object', function() {
     it('should be able to merge mapping of signals to a signal of out put', function() {
-      var answersReturned, appendAnswers, objectGoingIn, signalReturned;
-      objectGoingIn = {
+      const objectGoingIn = {
         signalA: Signal.fromArray([1, 2]),
-        signalB: Signal.fromArray('ab'.split(''))
+        signalB: Signal.fromArray(['a','b'])
       };
-      signalReturned = Signal.mergeObject(objectGoingIn);
-      answersReturned = [];
-      appendAnswers = Signal.onValue(function(a) {
+      const signalReturned = Signal.mergeObject(objectGoingIn);
+      let answersReturned = [];
+      const appendAnswers = Signal.onValue(function(a) {
         return answersReturned.push(a);
       });
       appendAnswers(signalReturned);
@@ -510,14 +502,13 @@ describe('With Signal', function() {
       ]);
     });
     return it('should be able to merge mapping of signals to a signal of out put of latest', function() {
-      var answersReturned, appendAnswers, objectGoingIn, signalReturned;
-      objectGoingIn = {
+      const objectGoingIn = {
         signalA: Signal.getLatest(Signal.fromArray([1, 2])),
-        signalB: Signal.getLatest(Signal.fromArray('ab'.split('')))
+        signalB: Signal.getLatest(Signal.fromArray('ab'.split('') || []))
       };
-      signalReturned = Signal.mergeObject(objectGoingIn);
-      answersReturned = [];
-      appendAnswers = Signal.onValue(function(a) {
+      const signalReturned = Signal.mergeObject(objectGoingIn);
+      let answersReturned = [];
+      const appendAnswers = Signal.onValue(function(a) {
         return answersReturned.push(a);
       });
       appendAnswers(signalReturned);
