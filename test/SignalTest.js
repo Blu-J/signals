@@ -10,7 +10,7 @@ var expect = require('chai').expect;
 
 
 
-import * as _ from 'lodash';
+const _ =  require('lodash');
 Promise = require('promise-polyfill');
 global.Promise = Promise;
 global._ = _;
