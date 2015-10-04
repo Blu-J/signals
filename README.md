@@ -2,11 +2,11 @@
 
 Thinking of changing values as an array over time. This is not an original idea, libraries like [RxJS](https://github.com/Reactive-Extensions/RxJS) from reactive extensions, and also from languages from the future like [Elm Lange](http://elm-lang.org/).
 
-# Why Another library
+## Why Another library
 
  RxJS does way to much, and we should have something that is simpler. Even [bacon js](https://baconjs.github.io/) is still not small. I also wanted something that was more functionally composable.
 
-# What Can it do for me
+## What Can it do for me
 
 This library can help create a single directional, lazy, async, and composable system. First, signals is a good way of making sure that data is going one way by trying to be immutable. Second, it allows it to be lazy, it won't calculate the whole graph, from the inputs the output, untill both ends exist. This means that in the end, the process is really close to the [transducer](http://jlongster.com/Transducers.js--A-JavaScript-Library-for-Transformation-of-Data), by implementing in lazy data structure with elm's [foldp](http://package.elm-lang.org/packages/elm-lang/core/1.1.0/Signal). 
 
