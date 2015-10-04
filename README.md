@@ -1,10 +1,10 @@
-# signals
+# Signals
 
 Thinking of changing values as an array over time. This is not an original idea, libraries like [RxJS](https://github.com/Reactive-Extensions/RxJS) from reactive extensions, and also from languages from the future like [Elm Lange](http://elm-lang.org/).
 
 # Why Another library
 
-Well, elm doesn't have a library that runs in JS. RxJS does way to much, and we should have something that is simpler. Even [bacon js](https://baconjs.github.io/) is still not small. I also wanted something that was more functionally composable.
+ RxJS does way to much, and we should have something that is simpler. Even [bacon js](https://baconjs.github.io/) is still not small. I also wanted something that was more functionally composable.
 
 # What Can it do for me
 
