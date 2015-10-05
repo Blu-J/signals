@@ -1,35 +1,11 @@
 /* @flow */
-type curry3<A,B,C,D> = (func:(a:A,b:B,c:C) => D, arity?:number) => (((a:A) => (b:B) => (c:C) => D) | ((a:A) => (b:B,c:C) => D) | (a:A,b:B,c:C) => D);
+type curry3<A,B,C,D> = (func:(a:A,b:B,c:C) => D) => (((a:A) => (b:B) => (c:C) => D) | ((a:A) => (b:B,c:C) => D) | (a:A,b:B,c:C) => D);
+type curry2<A,B,C> = (func:(a:A,b:B) => C) => (((a:A) => (b:B) => C) | (a:A,b:B) => C);
 type Signal<A> =
 {
   value:(A | Symbol);
   getNext: () => Promise<any>;
 };
-declare class LoDashWrapped<A> {
-  map<B>(fn:(a:A) => B): LoDashWrapped<B>;
-  valueOf(): A;
-  reduce<B>(fn: (b:B,a:A) => B, initial:B): LoDashWrapped<B>;
-  reverse(): LoDashWrapped<A>;
-}
-
-declare class LoDashObj {
-  chain<A>(a:Array<A>): LoDashWrapped<A>;
-  compose<A>(_:any) : Function;
-  curry:curry3;
-  each<A>(values:Array<A>,onEach:(a:A)=>any): void;
-  every<A>(values:Array<A>, predicateTest:(a:A) => boolean): boolean;
-  extend(...objects:Array<Object>):Object;
-  first<A>(values:Array<A>):A;
-  find<A>(values:Array<A>, haveFound:(a:A) => boolean): A;
-  isEmpty(object:Object):boolean;
-  map<A,B>(values:Array<A>, mapFunction: (a:A,index?:number) => B): Array<B>;
-  map<A,B>(valueObject:{[key:string]: A}, mapFunction: Function): Array<B>;
-  noop():void;
-  property(a:string):(obj:any)=>any;
-  reduce<A,B>(values: Array<A>,fn: (b:B,a:A) => B, initial:B): Array<B>;
-  rest<A>(values:Array<A>):Array<A>;
-}
-declare var _: LoDashObj;
 
 export const NEW_SIGNAL = Symbol ('NEW_SIGNAL');
 export const NONE = Symbol ('NONE');
@@ -39,6 +15,14 @@ function CreateResolvedPromise<A>(a:A):Promise<A> {
   return new Promise((resolve) => resolve(a));
 }
 const noop: Function = ()=>null;
+const curry_2: curry2 = (fn) => (a,b) =>
+  arguments.length >= 2 ? fn(a,b) :
+    (b) => fn(a,b);
+const curry_3: curry3 = (fn) => (a,b,c) =>
+  arguments.length >= 3 ? fn(a,b,c) :
+    arguments.length >= 2 ? (c) => fn(a,b,c) :
+    (b,c) => arguments.length >= 2 ? fn (a,b,c) :
+      (c) => fn(a,b,c);
 /**
  * Signal is a value over time, this is just a link to next moment in time. And is lazy
  * a -> (() -> Promise Signal a) -> Signal a
@@ -166,11 +150,11 @@ export function isSignal (predicateValue: Signal | any): boolean {
  * @param  {[type]} startingSignal    Signal a
  * @return {Function}                () -> () | Clean up
 */
-export const onValue = _.curry(function<E>(onValue:(a:E)=>any, startingSignal:Signal<E>):any {
+export const onValue = curry_2(function(onValue, startingSignal) {
   let withNext = function (signal) {
     const values = [].concat(signal.value);
     const isValue =  values.every(function(value){
-      return [NONE, NEW_SIGNAL].indexOf(value) === -1;
+      return NONE !== value && NEW_SIGNAL !== value;
     });
     if (signal.value == STOP){
       return;
@@ -195,7 +179,7 @@ export const onValue = _.curry(function<E>(onValue:(a:E)=>any, startingSignal:Si
  * @param  {Signal} signal       Signal a
  * @return {Sginal}              Signal state
 */
-export const foldp = _.curry(function <A,B>(foldFunction: (b:B,a:A)=>B , initialState: B, signal: Signal<A>): Signal<B>{
+export const foldp = curry_3(function <A,B>(foldFunction: (b:B,a:A)=>B , initialState: B, signal: Signal<A>): Signal<B>{
   //TODO
   const untilNext = function (nextSignal){
     const isSkipValue = nextSignal.value === NEW_SIGNAL || nextSignal.value === NONE;
@@ -225,7 +209,7 @@ export const foldp = _.curry(function <A,B>(foldFunction: (b:B,a:A)=>B , initial
  * @param  {Signal} signal      Signal a | Signal of domain
  * @return {Signal}             Signal b | Signal of codomain
 */
-export const map = _.curry(function<A,B>(mapFunction:(a:A)=>B, signal:Signal<A>):Signal<B> {
+export const map = curry_2(function<A,B>(mapFunction:(a:A)=>B, signal:Signal<A>):Signal<B> {
   return foldp ((memo, newValue) => mapFunction (newValue))(NEW_SIGNAL)(signal);
 });
 
@@ -291,7 +275,7 @@ export function join <A>(signalA:Signal<A>, signalB:Signal<A>): Signal<A>{
  * @param  {Signal} signal         Source
  * @return {Signal}                Filtered source
 */
-export var filter = _.curry(function<A,B>(filterFunction:(a:A)=>boolean, signal:Signal<A>):Signal<A> {
+export var filter = curry_2(function<A,B>(filterFunction:(a:A)=>boolean, signal:Signal<A>):Signal<A> {
   return foldp ((memo, newValue) => (!filterFunction (newValue) ? NONE : newValue), NEW_SIGNAL, signal);
 });
 
