@@ -15,14 +15,21 @@ function CreateResolvedPromise<A>(a:A):Promise<A> {
   return new Promise((resolve) => resolve(a));
 }
 const noop: Function = ()=>null;
-const curry_2: curry2 = (fn) => (a,b) =>
-  arguments.length >= 2 ? fn(a,b) :
-    (b) => fn(a,b);
-const curry_3: curry3 = (fn) => (a,b,c) =>
-  arguments.length >= 3 ? fn(a,b,c) :
-    arguments.length >= 2 ? (c) => fn(a,b,c) :
-    (b,c) => arguments.length >= 2 ? fn (a,b,c) :
-      (c) => fn(a,b,c);
+const curry_2: curry2 = function(fn){
+  return (a,b) =>
+   arguments.length >= 2 ? fn(a,b) :
+     (b) => fn(a,b);
+};
+const curry_3: curry3 = function (fn) {
+  return function(a,b,c){
+    return arguments.length >= 3 ? fn(a,b,c) :
+      arguments.length >= 2 ? (c) => fn(a,b,c) :
+      function(b,c) {
+        return arguments.length >= 2 ? fn (a,b,c) :
+        (c) => fn(a,b,c)
+      };
+  };
+};
 /**
  * Signal is a value over time, this is just a link to next moment in time. And is lazy
  * a -> (() -> Promise Signal a) -> Signal a
@@ -177,7 +184,7 @@ export const onValue = curry_2(function(onValue, startingSignal) {
  * @param  {Function} foldFunction (state -> a -> state) Reduce function
  * @param  {a} initialState a
  * @param  {Signal} signal       Signal a
- * @return {Sginal}              Signal state
+ * @return {Signal}              Signal state
 */
 export const foldp = curry_3(function <A,B>(foldFunction: (b:B,a:A)=>B , initialState: B, signal: Signal<A>): Signal<B>{
   //TODO
