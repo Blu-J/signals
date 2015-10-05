@@ -4,26 +4,13 @@ declare var it: Function;
 declare var expect: Function;
 declare var beforeEach: Function;
 
-
-
 var expect = require('chai').expect;
 
-
-
 const _ =  require('lodash');
-Promise = require('promise-polyfill');
-global.Promise = Promise;
-global._ = _;
 const Signal = require('../src/signal');
+global.Promise = require('promise-polyfill');
 
 describe('With Signal', function() {
-  beforeEach(function() {
-    if (typeof Promise._setImmediateFn === 'function'){
-      return Promise._setImmediateFn(function(fn) {
-        return fn();
-      });
-    }
-  });
   it('constructor', function() {
     var test = Signal.fromFunction(function() {});
     return expect(test).not.to.be.undefined;
@@ -183,6 +170,12 @@ describe('With Signal', function() {
       return it('should return in order the values sunk', function() {});
     });
     return describe('from promises', function() {
+
+      if (typeof Promise._setImmediateFn === 'function'){
+        return Promise._setImmediateFn(function(fn) {
+          return fn();
+        });
+      }
       var tupleLazyPromise = tupleLazyPromise = function() {
         var resolver:?Function = null;
         return [
@@ -398,7 +391,7 @@ describe('With Signal', function() {
       peer(allProducts(Signal.flatten(mapProduct(firstData))));
       return expect(lastSeen).to.deep.equal([['a', '1'], ['a', '2'], ['b', '1'], ['b', '2']]);
     });
-    return it.skip('should be able to big combination', function() {
+    return it('should be able to big combination', function() {
       const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
       const firstData = new Signal.fromArray(alphabet);
       let lastSeen = null;
@@ -412,7 +405,7 @@ describe('With Signal', function() {
         return console.log("A Value: " + value);
       });
       const combinationSet = _.compose(Signal.flatten,mapProduct);
-      const uberComb = _.compose(combinationSet);
+      const uberComb = _.compose(combinationSet,combinationSet,combinationSet,combinationSet);
       return peer(uberComb(firstData));
     });
   });

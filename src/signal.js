@@ -4,15 +4,49 @@ type curry2<A,B,C> = (func:(a:A,b:B) => C) => (((a:A) => (b:B) => C) | (a:A,b:B)
 type Signal<A> =
 {
   value:(A | Symbol);
-  getNext: () => Promise<any>;
+  getNext: () => Future<any>;
 };
+
+const NO_VALUE = Symbol("NO_VALUE");
+const Future = function<A>(withUpdate:(sink:(a:A)=>any)=>any){
+  let onResolveds = [];
+  let value = NO_VALUE;
+  this.then = function(onResolved){
+    return new Future (function resolveThenFuture(thenFutureResolve){
+      const updateFuture = function getResolvedAndPassOn(newValue){
+        const updatedValue = onResolved(newValue);
+        if(updatedValue && typeof updatedValue.then === "function" ){
+          updatedValue.then(thenFutureResolve)
+        }
+        else{
+          thenFutureResolve(updatedValue);
+        }
+      };
+      if(value !== NO_VALUE){
+        updateFuture(value);
+      }
+      else{
+        onResolveds.push(updateFuture);
+      }
+    });
+  };
+  withUpdate (function sinkForFuture(newValue){
+    if(value !== NO_VALUE){
+      return;
+    }
+    value = newValue;
+    onResolveds.forEach((onResolved) => onResolved(newValue));
+    onResolveds = [];
+  });
+
+}
 
 export const NEW_SIGNAL = Symbol ('NEW_SIGNAL');
 export const NONE = Symbol ('NONE');
 export const STOP = Symbol ('STOP');
 export const NO_VALUES: Array<Symbol> = [NEW_SIGNAL, NONE, STOP];
-function CreateResolvedPromise<A>(a:A):Promise<A> {
-  return new Promise((resolve) => resolve(a));
+function CreateResolvedFuture<A>(a:A):Future<A> {
+  return new Future((resolve) => resolve(a));
 }
 const noop: Function = ()=>null;
 const curry_2: curry2 = function(fn){
@@ -32,12 +66,12 @@ const curry_3: curry3 = function (fn) {
 };
 /**
  * Signal is a value over time, this is just a link to next moment in time. And is lazy
- * a -> (() -> Promise Signal a) -> Signal a
+ * a -> (() -> Future Signal a) -> Signal a
  * @param  {Any} @value   [description]
  * @param  {Function} @getNext [description]
  * @return {Signal}          [description]
 */
-function SignalFactory<A>(value: A, getNext: () => Promise<Signal<A>>):Signal<A>{
+function SignalFactory<A>(value: A, getNext: () => Future<Signal<A>>):Signal<A>{
   return {
     value,
     getNext
@@ -50,7 +84,7 @@ function CurrentSignal<A>(tailSignal: Signal<A>):Signal<A> {
   me.tailSignal = tailSignal;
   me.value = NEW_SIGNAL;
   update(tailSignal);
-  me.getNext = () => CreateResolvedPromise (me.tailSignal);
+  me.getNext = () => CreateResolvedFuture (me.tailSignal);
   return me;
 
 
@@ -82,8 +116,8 @@ export const fromArray = function<A> (array : Array<A>): Signal<A> {
     const resolveWithHead = function(resolve) {
       resolve(head)
     };
-    const newPromise = new Promise(resolveWithHead);
-    return SignalFactory (arrayValue, () => newPromise);
+    const newFuture = new Future(resolveWithHead);
+    return SignalFactory (arrayValue, () => newFuture);
   }, SIGNAL_DEAD);
 };
 
@@ -98,10 +132,10 @@ export const fastForwardFunction = function <A>(sinkNewValue: (sink:(a:A) => any
   const initValue = NEW_SIGNAL;
   let currentResolve:Function = noop;
   const newTail = function (value) {
-    const newPromise = new Promise (function(resolve: (newSignal:Signal)=> void) {
+    const newFuture = new Future (function(resolve: (newSignal:Signal)=> void) {
       currentResolve = resolve;
     });
-    return SignalFactory (value, () => newPromise);
+    return SignalFactory (value, () => newFuture);
   };
 
   const answer = newTail (initValue);
@@ -125,15 +159,15 @@ export const fromFunction = function <A>(sinkNewValue: (sink:(a:A)=>any) => any)
 
 /**
  * From Promises
- * Promise a -> ... -> Signal a
- * @param  {Promise} promises... [description]
+ * Future a -> ... -> Signal a
+ * @param  {Future} Futures... [description]
  * @return {Signal}             [description]
 */
-export const fromPromises = function<A>(...promises : Array<Promise<A>>): Signal<A> {
+export const fromPromises = function<A>(...Futures : Array<Future<A>>): Signal<A> {
   let sink;
   const assignSink = (newSink) => sink = newSink;
   const answer: Signal<A> = fromFunction(assignSink);
-  promises.forEach((promise: Promise) => promise.then(sink));
+  Futures.forEach((Future: Future) => Future.then(sink));
   return answer;
 };
 
@@ -158,7 +192,7 @@ export function isSignal (predicateValue: Signal | any): boolean {
  * @return {Function}                () -> () | Clean up
 */
 export const onValue = curry_2(function(onValue, startingSignal) {
-  let withNext = function (signal) {
+  let withNext = function withNext (signal) {
     const values = [].concat(signal.value);
     const isValue =  values.every(function(value){
       return NONE !== value && NEW_SIGNAL !== value;
@@ -169,7 +203,13 @@ export const onValue = curry_2(function(onValue, startingSignal) {
     if (isValue){
       onValue (signal.value);
     }
-    signal.getNext().then (withNext);
+    const nextFuture = signal.getNext();
+    let nextSignal;
+    nextFuture.then((a) => nextSignal = a);
+    if (nextSignal){
+      return withNext(nextSignal);
+    }
+    nextFuture.then (withNext);
   };
   withNext(startingSignal);
   return function () {
@@ -252,23 +292,23 @@ export function join <A>(signalA:Signal<A>, signalB:Signal<A>): Signal<A>{
   if (!signalA || signalA.value == STOP){
     return signalB;
   }
-  const nextSignal: (left: Promise<Signal<A>>,right:Promise<Signal<A>>) => Promise<Signal<A>> = function (promiseLeft, promiseRight):Promise {
-    const getNextSignal = (otherPromise) => (newSignal) =>
+  const nextSignal: (left: Future<Signal<A>>,right:Future<Signal<A>>) => Future<Signal<A>> = function (FutureLeft, FutureRight):Future {
+    const getNextSignal = (otherFuture) => (newSignal) =>
       !newSignal || newSignal.value === STOP ?
-        otherPromise :
+        otherFuture :
         SignalFactory (newSignal.value, () =>
-          nextSignal (newSignal.getNext(), otherPromise));
+          nextSignal (newSignal.getNext(), otherFuture));
     const signalOrEnd:(a:any) => Signal = (potentialSignal) =>
       isSignal(potentialSignal) ? potentialSignal : SIGNAL_DEAD;
 
-    const race = function(promises):Promise {
-      return new Promise(function(resolve){
-        promises.forEach((promise) => promise.then((potentialValue)=>resolve(potentialValue)))
+    const race = function(Futures):Future {
+      return new Future(function(resolve){
+        Futures.forEach((Future) => Future.then((potentialValue)=>resolve(potentialValue)))
       });
     };
     return race([
-      promiseLeft.then (getNextSignal (promiseRight)),
-      promiseRight.then (getNextSignal (promiseLeft))
+      FutureLeft.then (getNextSignal (FutureRight)),
+      FutureRight.then (getNextSignal (FutureLeft))
     ]);
   };
   return SignalFactory (signalA.value, () =>
