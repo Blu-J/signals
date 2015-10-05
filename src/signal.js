@@ -39,7 +39,7 @@ const Future = function<A>(withUpdate:(sink:(a:A)=>any)=>any){
     onResolveds = [];
   });
 
-}
+};
 
 export const NEW_SIGNAL = Symbol ('NEW_SIGNAL');
 export const NONE = Symbol ('NONE');

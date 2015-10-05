@@ -723,23 +723,41 @@ function isSignal(predicateValue) {
  * @return {Function}                () -> () | Clean up
 */
 var onValue = curry_2(function (onValue, startingSignal) {
-  var _withNext = function withNext(signal) {
-    var values = [].concat(signal.value);
-    var isValue = values.every(function (value) {
-      return NONE !== value && NEW_SIGNAL !== value;
-    });
-    if (signal.value == STOP) {
-      return;
+  var withNext = function withNext(_x) {
+    var _again = true;
+
+    _function: while (_again) {
+      var signal = _x;
+      values = isValue = nextFuture = nextSignal = undefined;
+      _again = false;
+
+      var values = [].concat(signal.value);
+      var isValue = values.every(function (value) {
+        return NONE !== value && NEW_SIGNAL !== value;
+      });
+      if (signal.value == STOP) {
+        return;
+      }
+      if (isValue) {
+        onValue(signal.value);
+      }
+      var nextFuture = signal.getNext();
+      var nextSignal = undefined;
+      nextFuture.then(function (a) {
+        return nextSignal = a;
+      });
+      if (nextSignal) {
+        _x = nextSignal;
+        _again = true;
+        continue _function;
+      }
+      nextFuture.then(withNext);
     }
-    if (isValue) {
-      onValue(signal.value);
-    }
-    signal.getNext().then(_withNext);
   };
-  _withNext(startingSignal);
+  withNext(startingSignal);
   return function () {
     onValue = noop;
-    _withNext = noop;
+    withNext = noop;
   };
 });
 
