@@ -54,7 +54,7 @@ describe('With Signal', function() {
       mainSignal = Signal.fromArray([ANSWER]);
       Signal.onValue(function(mainSignalValue) {
         return newValue = mainSignalValue;
-      }, mainSignal);
+      })(mainSignal);
       return expect(newValue).to.equal(ANSWER);
     });
     describe('with current signal', function() {
@@ -69,7 +69,7 @@ describe('With Signal', function() {
         sinker(ANSWER);
         Signal.onValue(function(mainSignalValue) {
           return newValue += mainSignalValue;
-        }, mainSignal);
+        })(mainSignal);
         return expect(newValue).to.equal(ANSWER);
       });
       it('should get the most current value, ignore older', function() {
@@ -87,7 +87,7 @@ describe('With Signal', function() {
         sinker(ANSWER);
         Signal.onValue(function(mainSignalValue) {
           return newValue += mainSignalValue;
-        }, mainSignal);
+        })(mainSignal);
         return expect(newValue).to.equal(ANSWER);
       });
       return it('should get the most current value, and new values, ignore older', function() {
@@ -107,7 +107,7 @@ describe('With Signal', function() {
         sinker(answerPartOne);
         Signal.onValue(function(mainSignalValue) {
           return newValue += mainSignalValue;
-        }, mainSignal);
+        })(mainSignal);
         sinker(answerPartTwo);
         return expect(newValue).to.equal(answer);
       });
@@ -161,7 +161,7 @@ describe('With Signal', function() {
       answer = '';
       Signal.onValue(function(value) {
         return answer += value;
-      }, signal);
+      })(signal);
       return function() {
         return answer;
       };
@@ -304,7 +304,7 @@ describe('With Signal', function() {
           return Signal.STOP;
         }
         return newValue;
-      }, 0);
+      })(0);
       peer = Signal.onValue(function(newValue) {
         return lastValue = newValue;
       });
@@ -314,66 +314,6 @@ describe('With Signal', function() {
       sinker(3);
       sinker(4);
       return expect(lastValue).to.equal(2);
-    });
-  });
-  describe("and with Signal.mergeOr", function() {
-    return it("should update on any signal update", function() {
-      var lastValue, mergedStream, mySinker, peer, sinkValue, stream1, stream2;
-      mySinker = _.noop;
-      sinkValue = "test";
-      lastValue = null;
-      stream1 = Signal.fromFunction(function() {});
-      stream2 = Signal.fromFunction(function(sinker) {
-        return mySinker = sinker;
-      });
-      mergedStream = Signal.mergeOr(stream1, stream2);
-      peer = Signal.onValue(function(newValue) {
-        return lastValue = newValue;
-      });
-      peer(mergedStream);
-      mySinker(sinkValue);
-      return expect(lastValue).to.deep.equal(null);
-    });
-  });
-  describe("and with Signal.mergeAnd", function() {
-    it("should not update if all did not update", function() {
-      var lastValue, mergedStream, mySinker, peer, sinkValue, stream1, stream2;
-      mySinker = _.noop;
-      sinkValue = "test";
-      lastValue = null;
-      stream1 = Signal.fromFunction(function() {});
-      stream2 = Signal.fromFunction(function(sinker) {
-        return mySinker = sinker;
-      });
-      mergedStream = Signal.mergeAnd(stream1, stream2);
-      peer = Signal.onValue(function(newValue) {
-        return lastValue = newValue;
-      });
-      peer(mergedStream);
-      mySinker(sinkValue);
-      return expect(lastValue).to.deep.equal(null);
-    });
-    return it("should update if all did update", function() {
-      var lastValue, mergedStream, mySinker, mySinker2, peer, sinkValue, sinkValue2, stream1, stream2;
-      mySinker = _.noop;
-      mySinker2 = _.noop;
-      sinkValue = "test";
-      sinkValue2 = "otherValue";
-      lastValue = null;
-      stream1 = Signal.fromFunction(function(sinker) {
-        return mySinker = sinker;
-      });
-      stream2 = Signal.fromFunction(function(sinker) {
-        return mySinker2 = sinker;
-      });
-      mergedStream = Signal.mergeAnd(stream1, stream2);
-      peer = Signal.onValue(function(newValue) {
-        return lastValue = newValue;
-      });
-      peer(mergedStream);
-      mySinker(sinkValue);
-      mySinker2(sinkValue2);
-      return expect(lastValue).to.deep.equal([sinkValue, sinkValue2]);
     });
   });
   describe('with filter', function() {
