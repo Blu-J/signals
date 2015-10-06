@@ -48,7 +48,7 @@ return [clickSignal,destroyWatch];
 }
 ```
 
-1. Wrap angular watch
+2. Wrap angular watch
 
 ```javascript
 someAngularModule.controller(function($scope){
