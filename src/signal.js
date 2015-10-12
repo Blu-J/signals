@@ -110,15 +110,11 @@ function CurrentSignal<A>(tailSignal: Signal<A>):Signal<A> {
  * @return {Signal a}       Signal a
 */
 export const fromArray = function<A> (array : Array<A>): Signal<A> {
-  return [NEW_SIGNAL].concat(array)
-  .reverse()
-  .reduce (function (head, arrayValue) {
-    const resolveWithHead = function(resolve) {
-      resolve(head)
-    };
-    const newFuture = new Future(resolveWithHead);
-    return SignalFactory (arrayValue, () => newFuture);
-  }, SIGNAL_DEAD);
+  const guarenteedArray = [].concat(array);
+  return fastForwardFunction(function sinkArray(sink) {
+    guarenteedArray.forEach((arrayValue) => sink(arrayValue));
+    sink(STOP);
+  });
 };
 
 /**
@@ -139,7 +135,18 @@ export const fastForwardFunction = function <A>(sinkNewValue: (sink:(a:A) => any
   };
 
   const answer = newTail (initValue);
-  sinkNewValue ((newValue) => currentResolve (newTail (newValue)));
+  sinkNewValue (function sinkIntoSignal(newValue) {
+    const isSkipValue = newValue === NEW_SIGNAL || newValue === NONE;
+    const isStop = newValue === STOP;
+    if (isStop){
+
+      return currentResolve(SIGNAL_DEAD);
+    }
+    if (isSkipValue) {
+      return;
+    }
+    return currentResolve (newTail (newValue));
+  });
   return answer;
 };
 
@@ -164,11 +171,11 @@ export const fromFunction = function <A>(sinkNewValue: (sink:(a:A)=>any) => any)
  * @return {Signal}             [description]
 */
 export const fromPromises = function<A>(...Futures : Array<Future<A>>): Signal<A> {
-  let sink;
-  const assignSink = (newSink) => sink = newSink;
-  const answer: Signal<A> = fromFunction(assignSink);
-  Futures.forEach((Future: Future) => Future.then(sink));
-  return answer;
+  const guarenteedArray = [].concat(array);
+  return fastForwardFunction(function sinkArray(sink) {
+    guarenteedArray.forEach((arrayValue) => arrayValue && typeof arrayValue.then === 'function' ? arrayValue.then(sink) : sink(arrayValue));
+    sink(STOP);
+  });
 };
 
 /**
@@ -227,7 +234,6 @@ export const onValue = curry_2(function(onValue, startingSignal) {
  * @return {Signal}              Signal state
 */
 export const foldp = curry_3(function <A,B>(foldFunction: (b:B,a:A)=>B , initialState: B, signal: Signal<A>): Signal<B>{
-  //TODO
   const untilNext = function (nextSignal){
     const isSkipValue = nextSignal.value === NEW_SIGNAL || nextSignal.value === NONE;
     const isStop = nextSignal.value === STOP;
@@ -334,9 +340,7 @@ export var filter = curry_2(function<A,B>(filterFunction:(a:A)=>boolean, signal:
 export function mergeObject <A>(objectToMerge: {[key:string]:Signal<A>}):Signal<A> {
   const keyPairToArraySignals = (signal:Signal, key:string) =>
     map (function (a) {
-      let answer = {};
-      answer[key] = a;
-      return answer;
+      return {[key]: a};
     })(signal)
   const setOfSignals: Array<Signal> = (Object.keys(objectToMerge) || [])
   .map((key)=>
