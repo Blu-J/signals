@@ -1,0 +1,21 @@
+{
+  "exclude": [],
+  "filesGlob": [
+    "src/**/*.ts"
+  ],
+  "compilerOptions": {
+    "outDir": "./dist/",
+    "sourceMap": true,
+    "noImplicitAny": true,
+    "module": "commonjs",
+    "target": "es5"
+  },
+  "compileOnSave": true,
+  "atom": {
+    "rewriteTsconfig": true,
+    "compileOnSave": true
+  },
+  "files": [
+    "src/signal.ts"
+  ]
+}

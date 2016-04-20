@@ -1,8 +1,0 @@
-[ignore]
-
-[include]
-  src/*.js
-  test/*.js
-[libs]
-
-[options]

@@ -1,5 +1,5 @@
 const _ =  require('lodash');
-const Signal = require('../dist/signals.js');
+const Signal = require('../dist/signal.js');
 const promisePolyfill = require('promise-polyfill');
 const chai =  require('chai');
 require('mocha');
@@ -8,7 +8,6 @@ const expect = chai.expect;
 
 describe('With Signal', function() {
   it('constructor', function() {
-    console.log("Signal is ", JSON.stringify(Signal));
     var test = Signal.fromFunction(function() {});
     return expect(test).not.to.be.undefined;
   });
@@ -38,7 +37,7 @@ describe('With Signal', function() {
       mainSignal = Signal.fromArray([ANSWER]);
       Signal.onValue(function(mainSignalValue) {
         return newValue = mainSignalValue;
-      })(mainSignal);
+      }, mainSignal);
       return expect(newValue).to.equal(ANSWER);
     });
     describe('with current signal', function() {
@@ -53,7 +52,7 @@ describe('With Signal', function() {
         sinker(ANSWER);
         Signal.onValue(function(mainSignalValue) {
           return newValue += mainSignalValue;
-        })(mainSignal);
+        }, mainSignal);
         return expect(newValue).to.equal(ANSWER);
       });
       it('should get the most current value, ignore older', function() {
@@ -71,7 +70,7 @@ describe('With Signal', function() {
         sinker(ANSWER);
         Signal.onValue(function(mainSignalValue) {
           return newValue += mainSignalValue;
-        })(mainSignal);
+        }, mainSignal);
         return expect(newValue).to.equal(ANSWER);
       });
       return it('should get the most current value, and new values, ignore older', function() {
@@ -91,7 +90,7 @@ describe('With Signal', function() {
         sinker(answerPartOne);
         Signal.onValue(function(mainSignalValue) {
           return newValue += mainSignalValue;
-        })(mainSignal);
+        }, mainSignal);
         sinker(answerPartTwo);
         return expect(newValue).to.equal(answer);
       });
@@ -105,18 +104,18 @@ describe('With Signal', function() {
       mainSignal = Signal.fromFunction(function(sink) {
         return sinker = sink;
       });
-      onValue1 = Signal.onValue(function(newValue) {
+      onValue1 = (sig) => Signal.onValue(function(newValue) {
         return lastValue1 = newValue;
-      });
-      onValue2 = Signal.onValue(function(newValue) {
+      }, sig);
+      onValue2 = (sig) => Signal.onValue(function(newValue) {
         return lastValue2 = newValue;
-      });
+      }, sig);
       onValue1(mainSignal);
       onValue2(mainSignal);
       sinker(ANSWER);
       return expect(lastValue1).to.equal(lastValue2);
     });
-    return it('should return a function that cleans up', function() {
+    it('should return a function that cleans up', function() {
       var cleanUp, lastValue, mySink, peer, signal, wrongAnswer;
       mySink = _.noop;
       signal = Signal.fromFunction(function(sink) {
@@ -124,9 +123,9 @@ describe('With Signal', function() {
       });
       lastValue = null;
       wrongAnswer = 'answer';
-      peer = Signal.onValue(function(a) {
+      peer = (sig) => Signal.onValue(function(a) {
         return lastValue = a;
-      });
+      }, sig);
       cleanUp = peer(signal);
       cleanUp();
       mySink(wrongAnswer);
@@ -145,7 +144,7 @@ describe('With Signal', function() {
       answer = '';
       Signal.onValue(function(value) {
         return answer += value;
-      })(signal);
+      }, signal);
       return function() {
         return answer;
       };
@@ -233,12 +232,12 @@ describe('With Signal', function() {
         return sinker = sink;
       });
       mainSignal;
-      sum = Signal.foldp(function(memo, newValue) {
+      sum = (sig) => Signal.foldp(function(memo, newValue) {
         return memo + newValue;
-      }, 0);
-      peer = Signal.onValue(function(currentValue) {
+      }, 0, sig);
+      peer = (sig) => Signal.onValue(function(currentValue) {
         return lastValue = currentValue;
-      });
+      }, sig);
       peer(sum(mainSignal));
       sinker(1);
       sinker(2);
@@ -248,92 +247,45 @@ describe('With Signal', function() {
     it('then from array should work as a fold, for example sum', function() {
       var lastValue, mainSignal, peer, sum;
       lastValue = null;
-      mainSignal = Signal.fromArray([1, Signal.NEW_SIGNAL, 2, Signal.NONE, 3]);
-      sum = Signal.foldp(function(memo, newValue) {
+      mainSignal = Signal.fromArray([1, 2, 3]);
+      sum = (sig) => Signal.foldp(function(memo, newValue) {
         return memo + newValue;
-      }, 0);
-      peer = Signal.onValue(function(currentValue) {
+      }, 0, sig);
+      peer = (sig) => Signal.onValue(function(currentValue) {
         return lastValue = currentValue;
-      });
+      }, sig);
       peer(sum(mainSignal));
       return expect(lastValue).to.equal(6);
     });
-    it('should work as a filter when we push in NONE', function() {
-      var filterEven, lastValue, mainSignal, peer, sinker;
-      sinker = _.noop;
-      lastValue = null;
-      mainSignal = Signal.fromFunction(function(sink) {
-        return sinker = sink;
-      });
-      mainSignal;
-      filterEven = Signal.foldp(function(memo, newValue) {
-        if (newValue % 2 !== 0) {
-          return Signal.NONE;
-        }
-        return memo + newValue;
-      }, 0);
-      peer = Signal.onValue(function(newValue) {
-        return lastValue = newValue;
-      });
-      peer(filterEven(mainSignal));
-      sinker(1);
-      sinker(2);
-      sinker(3);
-      sinker(6);
-      return expect(lastValue).to.equal(8);
-    });
-    return it('should we send the end, then no more values get updated', function() {
-      var lastValue, mainSignal, peer, sinker, stopAtThree;
-      sinker = _.noop;
-      lastValue = null;
-      mainSignal = Signal.fromFunction(function(sink) {
-        return sinker = sink;
-      });
-      stopAtThree = Signal.foldp(function(memo, newValue) {
-        if (newValue === 3) {
-          return Signal.STOP;
-        }
-        return newValue;
-      })(0);
-      peer = Signal.onValue(function(newValue) {
-        return lastValue = newValue;
-      });
-      peer(stopAtThree(mainSignal));
-      sinker(1);
-      sinker(2);
-      sinker(3);
-      sinker(4);
-      return expect(lastValue).to.equal(2);
-    });
   });
   describe('with filter', function() {
-    return it('should filter values not deeamed correct', function() {
+    it('should filter values not deeamed correct', function() {
       var filterEvens, peer, signal, sinker;
       var values = [];
       sinker = null;
       signal = Signal.fromArray([1, 2, 3, 4, 5]);
-      filterEvens = Signal.filter(function(value) {
+      filterEvens = (sig) => Signal.filter(function(value) {
         return value % 2 === 0;
-      });
-      peer = Signal.onValue(function(newValue) {
+      },sig);
+      peer = (sig) =>Signal.onValue(function(newValue) {
         return values.push(newValue);
-      });
+      },sig);
       peer(filterEvens(signal));
       return expect(values).to.deep.equal([2, 4]);
     });
   });
   describe('with map', function() {
-    return it('should transform data coming in', function() {
+    it('should transform data coming in', function() {
       var double, peer, signal, sinker;
       var values = [];
       sinker = null;
       signal = Signal.fromArray([1, 2, 3, 4, 5]);
-      double = Signal.map(function(value) {
+      double = (sig) => Signal.map(function(value) {
         return value * 2;
-      });
-      peer = Signal.onValue(function(newValue) {
+      }, sig);
+      peer = (sig) => Signal.onValue(function(newValue) {
         return values.push(newValue);
-      });
+      }, sig);
       peer(double(signal));
       return expect(values).to.deep.equal([2, 4, 6, 8, 10]);
     });
@@ -345,9 +297,9 @@ describe('With Signal', function() {
       sink1 = _.noop;
       sink2 = _.noop;
       var answer = [];
-      peep = Signal.onValue(function(value) {
+      peep = (sig) => Signal.onValue(function(value) {
         return answer.push(value);
-      });
+      }, sig);
       peep(Signal.join(Signal.fromFunction(function(sink) {
         return sink1 = sink;
       }), Signal.fromFunction(function(sink) {
@@ -363,9 +315,9 @@ describe('With Signal', function() {
       var expectedAnswer, peep;
       expectedAnswer = [1, 2, 3, 4];
       var answer = [];
-      peep = Signal.onValue(function(value) {
+      peep = (sig) => Signal.onValue(function(value) {
         return answer.push(value);
-      });
+      }, sig);
       peep(Signal.join(Signal.fromArray([1, 2]), Signal.fromArray([3, 4])));
       return expect(answer).to.deep.equal(expectedAnswer);
     });
@@ -378,18 +330,18 @@ describe('With Signal', function() {
           return [firstPart, b];
         }));
       };
-      mapProduct = Signal.map(createSubSignal);
-      allProducts = Signal.foldp(function(total, pair) {
+      mapProduct = (sig) => Signal.map(createSubSignal, sig);
+      allProducts = (sig) => Signal.foldp(function(total, pair) {
         return total.concat([pair]);
-      }, []);
-      peer = Signal.onValue(function(value) {
+      }, [], sig);
+      peer = (sig) => Signal.onValue(function(value) {
         return lastSeen = value;
-      });
+      }, sig);
       peer(allProducts(Signal.flatten(mapProduct(firstData))));
       return expect(lastSeen).to.deep.equal([['a', '1'], ['a', '2'], ['b', '1'], ['b', '2']]);
     });
   });
-  return describe('merge with object', function() {
+  describe('merge with object', function() {
     it('should be able to merge mapping of signals to a signal of out put', function() {
       const objectGoingIn = {
         signalA: Signal.fromArray([1, 2]),
@@ -397,9 +349,9 @@ describe('With Signal', function() {
       };
       const signalReturned = Signal.mergeObject(objectGoingIn);
       var answersReturned = [];
-      const appendAnswers = Signal.onValue(function(a) {
+      const appendAnswers = (sig) => Signal.onValue(function(a) {
         return answersReturned.push(a);
-      });
+      }, sig);
       appendAnswers(signalReturned);
       return expect(answersReturned).to.deep.equal([
         {
@@ -415,17 +367,18 @@ describe('With Signal', function() {
         }
       ]);
     });
-    return it('should be able to merge mapping of signals to a signal of out put of latest', function() {
+    it('should be able to merge mapping of signals to a signal of out put of latest', function() {
       const objectGoingIn = {
         signalA: Signal.getLatest(Signal.fromArray([1, 2])),
         signalB: Signal.getLatest(Signal.fromArray('ab'.split('') || []))
       };
       const signalReturned = Signal.mergeObject(objectGoingIn);
       var answersReturned = [];
-      const appendAnswers = Signal.onValue(function(a) {
+      const appendAnswers = (sig) => Signal.onValue(function(a) {
         return answersReturned.push(a);
-      });
+      }, sig);
       appendAnswers(signalReturned);
+      console.log('answersReturned',answersReturned)
       return expect(answersReturned).to.deep.equal([
         {
           signalA: 2
