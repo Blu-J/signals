@@ -39,12 +39,12 @@ const keypressEventsToNumbers = keyCodeToNumber(onlyNumberKeypress(keypressEvent
 
 ```javascript
 function watchEvent (element:element,event:string){
-let destroyWatch = noop;
-const clickSignal = signal.fromFunction(function(sink){
- element.addEventListener(event, sink);
- destroyWatch = () => element.removeEventListener(event,sink);
-});
-return [clickSignal,destroyWatch];
+  let destroyWatch = noop;
+  const eventSignal = signal.fromFunction(function(sink){
+    element.addEventListener(event, sink);
+    destroyWatch = () => element.removeEventListener(event,sink);
+  });
+  return [eventSignal,destroyWatch];
 }
 ```
 
@@ -52,9 +52,9 @@ return [clickSignal,destroyWatch];
 
 ```javascript
 someAngularModule.controller(function($scope){
- const changingXValues = signal.fromFunction(function(sink){
-  $scope.$watch('x',sink);
- });
+  const changingXValues = signal.fromFunction(function(sink){
+    $scope.$watch('x',sink);
+  });
 });
 
 ```
@@ -71,7 +71,7 @@ There is an idea that a stream is live or not, which has a optimization benefit,
 
 By having a smaller library, means that there is more consistancy in use. 
 
-Errors are propagated as a subchannel in the events, when in reality probably should be wrapped by and Either functor or something similar. By not dealing with the error subchannel, and only having one channel, there is more simplicity. 
+Errors are propagated as a subchannel in the events, when in reality probably should be wrapped by an Either functor or something similar. By not dealing with the error subchannel, and only having one channel, there is more simplicity. 
 
 
 ### Why Over Bacon-js
