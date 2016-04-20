@@ -248,7 +248,7 @@ export const fromFunction = function <A>(sinkNewValue:(sink:(a:A, action?: Maybe
  * Mailbox returns a object for the signal and the address, or the sink to drop the new values into.
  * @return {{signal:Signal, address: Function}} The address and the signal to update
  */
-export const mailBox = <A> () => {
+export const mailbox = <A> () => {
   let address:(a:A, action?: Maybe<SignalActions>)=> void;
   const signal = fromFunction<A>(sink => address = sink);
   return {
