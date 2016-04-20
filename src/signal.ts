@@ -1,29 +1,29 @@
 
-enum FutureValues {
+export enum FutureValues {
   NO_VALUE,
   VALUE,
-};
-enum SignalActions {
+}
+export enum SignalActions {
   'NOOP',
   'STOP',
-};
-interface SignalValue<A> {
+}
+export interface SignalValue<A> {
   value: A,
   getNext: () => Future<Signal<A>>,
-};
-interface SignalAction<A> {
+}
+export interface SignalAction<A> {
   signalAction: SignalActions,
   getNext: () => Future<Signal<A>>,
-};
-interface CurrentSignalValue<A> extends SignalValue<A> {
+}
+export interface CurrentSignalValue<A> extends SignalValue<A> {
   tailSignal: Signal<A>,
-};
-interface CurrentSignalAction<A> extends SignalAction<A> {
+}
+export interface CurrentSignalAction<A> extends SignalAction<A> {
   tailSignal: Signal<A>,
-};
-type Maybe<T> = T | void;
-type Signal<A> =SignalValue<A> | SignalAction<A>;
-const Maybe = {
+}
+export type Maybe<T> = T | void;
+export type Signal<A> =SignalValue<A> | SignalAction<A>;
+export const Maybe = {
   isDefined<T>(x: Maybe<T>):x is T{
     return x !== undefined && x !== null;
   }
@@ -74,7 +74,7 @@ export const isSignal = <A>(predicateValue: Signal<A> | A):predicateValue is Sig
 }
 
 
-class Future <A> {
+export class Future <A> {
   onResolveds: ((a:A) => any)[];
   valueType: FutureValues;
   onResolvedPairs: [Function, Function][];
@@ -126,7 +126,6 @@ class Future <A> {
     })
   }
 }
-export const NO_VALUES = [SignalActions.NOOP, SignalActions.STOP];
 function CreateResolvedFuture<A>(a:A): Future<A> {
   return new Future<A>(resolve => resolve(a));
 }
@@ -134,6 +133,18 @@ const noop = ():void => null;
 const noopFuture = ():Future<void> => Future.of<void>(() => null);
 type Curry_2<A,B,C> = ((a:A) => (b:B) => C)
   | ((a:A, b:B) => C);
+
+function onceThunk<A>(fn: () => A):(() => A){
+  let cache: Maybe<A>;
+  return () => {
+    if(Maybe.isDefined(cache)){
+      return cache;
+    }
+    const newCache = fn();
+    cache = newCache;
+    return newCache;
+  };
+}
 /**
  * Signal is a value over time, this is just a link to next moment in time. And is lazy
  * a -> (() -> Future Signal a) -> Signal a
@@ -142,23 +153,21 @@ type Curry_2<A,B,C> = ((a:A) => (b:B) => C)
  * @return {Signal}          [description]
 */
 function SignalFactory<A>(value:A, getNext:(() => Future<Signal<A>>), signalAction?: Maybe<SignalActions>):Signal<A> {
+  const cachedSignalFactory = onceThunk(getNext);
   if(Maybe.isDefined(signalAction)){
     return {
       signalAction: signalAction,
-      getNext: getNext,
+      getNext: cachedSignalFactory,
     };
   }
   return {
     value,
-    getNext
+    getNext:cachedSignalFactory,
   };
 }
 
 type CurrentSignal<A> = CurrentSignalValue<A> | CurrentSignalAction<A>
-const SIGNAL_DEAD = {
-  signalAction: SignalActions.STOP,
-  getNext: () => CreateResolvedFuture(SIGNAL_DEAD),
-};
+const SIGNAL_DEAD:Signal<any> = SignalFactory(null, () => CreateResolvedFuture(SIGNAL_DEAD), SignalActions.STOP);
 function CurrentSignal<A>(tailSignal: Signal<A>):CurrentSignal<A> {
   const me:CurrentSignalAction<A> = {
     tailSignal: tailSignal,
@@ -235,8 +244,21 @@ export const fromFunction = function <A>(sinkNewValue:(sink:(a:A, action?: Maybe
   return CurrentSignal(fastForwardFunction(sinkNewValue));
 };
 
+/**
+ * Mailbox returns a object for the signal and the address, or the sink to drop the new values into.
+ * @return {{signal:Signal, address: Function}} The address and the signal to update
+ */
+export const mailBox = <A> () => {
+  let address:(a:A, action?: Maybe<SignalActions>)=> void;
+  const signal = fromFunction<A>(sink => address = sink);
+  return {
+    signal: signal,
+    address: address,
+  };
+};
 
-interface Thenable <A> {
+
+export interface Thenable <A> {
   then<B>(isGood: (a:A) => Thenable<B> | B): Thenable<B>;
 }
 /**
@@ -283,26 +305,18 @@ export const onSignalValue = <A>(onValue: (a:SignalValue<A>) => void, signal: Si
 };
 
 const onLazySignalValueSignal = <A, B>(onValue: (a:SignalValue<A>) => Signal<B>, signal: (Signal<A> | Future<Signal<A>>), currentValue?: Maybe<B>): Signal<B> => {
-  let futurePromise: Maybe<Future<Signal<B>>>;
-  const getNext:() => Future<Signal<B>> = () => {
-    if(Maybe.isDefined(futurePromise)){
-      return futurePromise;
-    }
-    const newFuture = new Future<Signal<B>>(sink => onSignalValue<A>((newSignal) => sink(onValue(newSignal)), signal));
-    futurePromise = newFuture
-    return newFuture;
-  };
+  const getNext = onceThunk(
+    () => new Future<Signal<B>>(
+      sink => onSignalValue<A>(
+        (newSignal)=> sink(
+          onValue(newSignal)),
+          signal))
+  );
   if(Maybe.isDefined(currentValue)){
-    return {
-      value: currentValue,
-      getNext: getNext,
-    };
+    return SignalFactory(currentValue, getNext);
   }
-  return {
-    signalAction: SignalActions.NOOP,
-    getNext: getNext,
-  };
-}
+  return SignalFactory(null, getNext, SignalActions.NOOP);
+};
 
 /**
  * This is a each loop that is expecting side effects
@@ -388,16 +402,13 @@ export const join = <A,B>(signalA: Signal<A>, signalB: Signal<B>): Signal<A|B> =
     const signalOrEnd = (potentialSignal:Signal<A | B> | any):Signal<A | B> => isSignal(potentialSignal) ? potentialSignal : SIGNAL_DEAD;
 
     const raceFns = function (Futures: (() => Future<Signal<A | B>>)[]): Future<Signal<A | B>> {
-      let done = false;
       return new Future<Signal<A | B>>(function (resolve) {
-        Futures.forEach((Future) => {
-          if(done){
-            return;
-          }
-          return Future().then(potentialValue => {
-            done = true;
+        Futures.some((Future) => {
+          const future = Future();
+          future.then(potentialValue => {
             resolve(potentialValue);
-          })
+          });
+          return future.valueType === FutureValues.VALUE;
         });
       });
     };
@@ -434,10 +445,7 @@ export const flatten = <A>(signal: Signal<Signal<A> | A>): Signal<A> => {
   const withNext = (signal:SignalValue<A>): Signal<A> => {
     if(isSignal<A>(signal.value)){
       const leftHandSide = <any>signal.value;
-      const rightHandSide = {
-        signalAction: SignalActions.NOOP,
-        getNext: () => signal.getNext(),
-      };
+      const rightHandSide = SignalFactory(null, () => signal.getNext(), SignalActions.NOOP);
       return flatten(<Signal<A>>join(<Signal<A>>leftHandSide, rightHandSide));
     }
     return onLazySignalValueSignal<A, A>(withNext, signal.getNext(), signal.value);

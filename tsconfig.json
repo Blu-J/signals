@@ -8,6 +8,7 @@
     "sourceMap": true,
     "noImplicitAny": true,
     "module": "commonjs",
+    "declaration": true,
     "target": "es5"
   },
   "compileOnSave": true,

@@ -1,21 +1,15 @@
 "use strict";
-var FutureValues;
 (function (FutureValues) {
     FutureValues[FutureValues["NO_VALUE"] = 0] = "NO_VALUE";
     FutureValues[FutureValues["VALUE"] = 1] = "VALUE";
-})(FutureValues || (FutureValues = {}));
-;
-var SignalActions;
+})(exports.FutureValues || (exports.FutureValues = {}));
+var FutureValues = exports.FutureValues;
 (function (SignalActions) {
     SignalActions[SignalActions['NOOP'] = 0] = 'NOOP';
     SignalActions[SignalActions['STOP'] = 1] = 'STOP';
-})(SignalActions || (SignalActions = {}));
-;
-;
-;
-;
-;
-var Maybe = {
+})(exports.SignalActions || (exports.SignalActions = {}));
+var SignalActions = exports.SignalActions;
+exports.Maybe = {
     isDefined: function (x) {
         return x !== undefined && x !== null;
     }
@@ -39,6 +33,12 @@ var isSignalAnSignalAction = function (signal) {
     }
     return false;
 };
+/**
+ * Determines is value is a signal
+ * a -> Booelan
+ * @param  {[type]} predicateValue [description]
+ * @return {[type]}                [description]
+*/
 exports.isSignal = function (predicateValue) {
     if (!(predicateValue instanceof Object)) {
         return false;
@@ -111,28 +111,44 @@ var Future = (function () {
     };
     return Future;
 }());
-exports.NO_VALUES = [SignalActions.NOOP, SignalActions.STOP];
+exports.Future = Future;
 function CreateResolvedFuture(a) {
     return new Future(function (resolve) { return resolve(a); });
 }
 var noop = function () { return null; };
 var noopFuture = function () { return Future.of(function () { return null; }); };
+function onceThunk(fn) {
+    var cache;
+    return function () {
+        if (exports.Maybe.isDefined(cache)) {
+            return cache;
+        }
+        var newCache = fn();
+        cache = newCache;
+        return newCache;
+    };
+}
+/**
+ * Signal is a value over time, this is just a link to next moment in time. And is lazy
+ * a -> (() -> Future Signal a) -> Signal a
+ * @param  {Any} @value   [description]
+ * @param  {Function} @getNext [description]
+ * @return {Signal}          [description]
+*/
 function SignalFactory(value, getNext, signalAction) {
-    if (Maybe.isDefined(signalAction)) {
+    var cachedSignalFactory = onceThunk(getNext);
+    if (exports.Maybe.isDefined(signalAction)) {
         return {
             signalAction: signalAction,
-            getNext: getNext,
+            getNext: cachedSignalFactory,
         };
     }
     return {
         value: value,
-        getNext: getNext
+        getNext: cachedSignalFactory,
     };
 }
-var SIGNAL_DEAD = {
-    signalAction: SignalActions.STOP,
-    getNext: function () { return CreateResolvedFuture(SIGNAL_DEAD); },
-};
+var SIGNAL_DEAD = SignalFactory(null, function () { return CreateResolvedFuture(SIGNAL_DEAD); }, SignalActions.STOP);
 function CurrentSignal(tailSignal) {
     var me = {
         tailSignal: tailSignal,
@@ -150,6 +166,12 @@ function CurrentSignal(tailSignal) {
         next.then(function (nextSignal) { return update(nextSignal); });
     }
 }
+/**
+ * Create a signal form an array
+ * [a...] -> Signal a
+ * @param  {Array a} array [a...] | Value of a
+ * @return {Signal a}       Signal a
+*/
 exports.fromArray = function (array) {
     var guarenteedArray = [].concat(array);
     return exports.fastForwardFunction(function sinkArray(sink) {
@@ -157,6 +179,13 @@ exports.fromArray = function (array) {
         sink(null, SignalActions.STOP);
     });
 };
+/**
+ * create a signal from a function that can 'sink' values in
+ * Note that this could be a memory leak
+ * ((a -> ()) -> ()) -> Signal a
+ * @param  {Function} sinkNewValue (a -> ()) -> () | A function to drop a new value
+ * @return {Signal}              Signal a
+*/
 exports.fastForwardFunction = function (sinkNewValue) {
     var initValue = SignalActions.NOOP;
     var currentResolve = noop;
@@ -180,9 +209,34 @@ exports.fastForwardFunction = function (sinkNewValue) {
     });
     return answer;
 };
+/**
+ * create a signal from a function that can 'sink' values in
+ * Note that this could be a memory leak
+ * ((a -> ()) -> ()) -> CurrentSignal a
+ * @param  {Function} sinkNewValue (a -> ()) -> () | A function to drop a new value
+ * @return {Signal}              CurrentSignal a | A current signal of a
+*/
 exports.fromFunction = function (sinkNewValue) {
     return CurrentSignal(exports.fastForwardFunction(sinkNewValue));
 };
+/**
+ * Mailbox returns a object for the signal and the address, or the sink to drop the new values into.
+ * @return {{signal:Signal, address: Function}} The address and the signal to update
+ */
+exports.mailBox = function () {
+    var address;
+    var signal = exports.fromFunction(function (sink) { return address = sink; });
+    return {
+        signal: signal,
+        address: address,
+    };
+};
+/**
+ * From Promises
+ * Future a -> ... -> Signal a
+ * @param  {Future} Futures... [description]
+ * @return {Signal}             [description]
+*/
 exports.fromPromises = function () {
     var futures = [];
     for (var _i = 0; _i < arguments.length; _i++) {
@@ -197,7 +251,7 @@ exports.fromPromises = function () {
 exports.onSignalValue = function (onValue, signal) {
     var currentSignal;
     var clear = function () {
-        if (Maybe.isDefined(currentSignal)) {
+        if (exports.Maybe.isDefined(currentSignal)) {
             currentSignal.getNext().withoutThen(withNext);
         }
     };
@@ -223,26 +277,20 @@ exports.onSignalValue = function (onValue, signal) {
     return clear;
 };
 var onLazySignalValueSignal = function (onValue, signal, currentValue) {
-    var futurePromise;
-    var getNext = function () {
-        if (Maybe.isDefined(futurePromise)) {
-            return futurePromise;
-        }
-        var newFuture = new Future(function (sink) { return exports.onSignalValue(function (newSignal) { return sink(onValue(newSignal)); }, signal); });
-        futurePromise = newFuture;
-        return newFuture;
-    };
-    if (Maybe.isDefined(currentValue)) {
-        return {
-            value: currentValue,
-            getNext: getNext,
-        };
+    var getNext = onceThunk(function () { return new Future(function (sink) { return exports.onSignalValue(function (newSignal) { return sink(onValue(newSignal)); }, signal); }); });
+    if (exports.Maybe.isDefined(currentValue)) {
+        return SignalFactory(currentValue, getNext);
     }
-    return {
-        signalAction: SignalActions.NOOP,
-        getNext: getNext,
-    };
+    return SignalFactory(null, getNext, SignalActions.NOOP);
 };
+/**
+ * This is a each loop that is expecting side effects
+ * Notes that this returns a garbage collection, that combined with a fromFunction, it will hold memory all the way to the source
+ * (a -> ()) -> Signal a -> (() -> ())
+ * @param  {Function} onValue        a -> () | Where we call on signal
+ * @param  {[type]} startingSignal    Signal a
+ * @return {Function}                () -> () | Clean up
+*/
 exports.onValue = function (onValueFn, startingSignal) {
     var currentClear = noop;
     var withNext = function (signal) {
@@ -254,6 +302,14 @@ exports.onValue = function (onValueFn, startingSignal) {
         currentClear();
     };
 };
+/**
+ * [Fold](https://en.wikipedia.org/wiki/Fold_(higher-order_function)) but with a signal, which is potential future
+ * (a -> b) -> a -> signal a -> signal b
+ * @param  {Function} foldFunction (state -> a -> state) Reduce function
+ * @param  {a} initialState a
+ * @param  {Signal} signal       Signal a
+ * @return {Signal}              Signal state
+*/
 exports.foldp = function (foldFunction, initialState, signal) {
     var state = initialState;
     var withNext = function (signal) {
@@ -263,6 +319,13 @@ exports.foldp = function (foldFunction, initialState, signal) {
     };
     return onLazySignalValueSignal(withNext, signal);
 };
+/**
+ * Map a function across the signal
+ * (a -> b) -> Signal a -> Signal b
+ * @param  {Function} mapFunction (a -> b) | map domain to codomain
+ * @param  {Signal} signal      Signal a | Signal of domain
+ * @return {Signal}             Signal b | Signal of codomain
+*/
 exports.map = function (mapFunction, signal) {
     var withNext = function (signal) {
         var newState = mapFunction(signal.value);
@@ -270,6 +333,13 @@ exports.map = function (mapFunction, signal) {
     };
     return onLazySignalValueSignal(withNext, signal);
 };
+/**
+ * Join two signals into one, dies when both die.
+ * Signal a -> Signal b -> Signal (a | b)
+ * @param  {Signal} signalA [description]
+ * @param  {Signal} signalB [description]
+ * @return {Signal}         [description]
+ */
 exports.join = function (signalA, signalB) {
     if (isSignalAnSignalAction(signalA) && signalA.signalAction === SignalActions.STOP) {
         return signalB;
@@ -286,16 +356,13 @@ exports.join = function (signalA, signalB) {
         };
         var signalOrEnd = function (potentialSignal) { return exports.isSignal(potentialSignal) ? potentialSignal : SIGNAL_DEAD; };
         var raceFns = function (Futures) {
-            var done = false;
             return new Future(function (resolve) {
-                Futures.forEach(function (Future) {
-                    if (done) {
-                        return;
-                    }
-                    return Future().then(function (potentialValue) {
-                        done = true;
+                Futures.some(function (Future) {
+                    var future = Future();
+                    future.then(function (potentialValue) {
                         resolve(potentialValue);
                     });
+                    return future.valueType === FutureValues.VALUE;
                 });
             });
         };
@@ -309,6 +376,13 @@ exports.join = function (signalA, signalB) {
     }
     return SignalFactory(null, function () { return nextSignal(signalA.getNext(), signalB.getNext()); }, SignalActions.NOOP);
 };
+/**
+ * Filter a signal over time
+ * (a -> boolean) -> Signal a -> Signal a
+ * @param  {Function} filterFunction Truth means to bring it forward
+ * @param  {Signal} signal         Source
+ * @return {Signal}                Filtered source
+*/
 exports.filter = function (filterFunction, signal) {
     var withNext = function (signal) {
         var isFilteredIn = filterFunction(signal.value);
@@ -323,16 +397,18 @@ exports.flatten = function (signal) {
     var withNext = function (signal) {
         if (exports.isSignal(signal.value)) {
             var leftHandSide = signal.value;
-            var rightHandSide = {
-                signalAction: SignalActions.NOOP,
-                getNext: function () { return signal.getNext(); },
-            };
+            var rightHandSide = SignalFactory(null, function () { return signal.getNext(); }, SignalActions.NOOP);
             return exports.flatten(exports.join(leftHandSide, rightHandSide));
         }
         return onLazySignalValueSignal(withNext, signal.getNext(), signal.value);
     };
     return onLazySignalValueSignal(withNext, signal);
 };
+/**
+ * { k` = Signal a`, k`` = Signal a``, ..., k^n = a^n} -> Signal { k` = a`, k`` = a``, ..., k^n = a^n}
+ * @param  {[type]} objectToMerge [description]
+ * @return {[type]}               [description]
+*/
 exports.mergeObject = function (objectToMerge) {
     var keyPairToArraySignals = function (signal, key) { return exports.map(function (a) {
         return [key, a];
@@ -350,6 +426,12 @@ exports.mergeObject = function (objectToMerge) {
     var filterEmpty = function (signal) { return exports.filter(function (a) { return Object.keys(a).length > 0; }, signal); };
     return filterEmpty(backToObject(joinedSignal));
 };
+/**
+ * { k` = Signal a`, k`` = Signal a``, ..., k^n = a^n} -> Signal { k` = a`, k`` = a``, ..., k^n = a^n}
+ * Uses an and change
+ * @param  {Object} objectToMerge [description]
+ * @return {Signal}               [description]
+ */
 exports.mergeObjectAnd = function (objectToMerge) {
     var mergedSignal = exports.mergeObject(objectToMerge);
     var previousAndNext = exports.foldp(function (pair, next) {
@@ -372,6 +454,9 @@ exports.mergeObjectAnd = function (objectToMerge) {
     }, filteredPreviousAndNext);
 };
 exports.getLatest = function (signalA) { return CurrentSignal(signalA); };
+/**
+ * These are functions that will return a signal that follows the tails, ensuring that the latest is always there.
+*/
 var mergeObjectLatest = function (a) {
     return exports.getLatest(exports.mergeObject(a));
 };

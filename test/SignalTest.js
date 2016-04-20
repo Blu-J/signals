@@ -40,6 +40,17 @@ describe('With Signal', function() {
       }, mainSignal);
       return expect(newValue).to.equal(ANSWER);
     });
+    it('should be able to get each value with mailbox', function() {
+      var ANSWER, newValue;
+      newValue = null;
+      ANSWER = 'test';
+      const mailbox = Signal.mailbox();
+      Signal.onValue(function(mainSignalValue) {
+        return newValue = mainSignalValue;
+      }, mailbox.signal);
+      mailbox.address(ANSWER);
+      return expect(newValue).to.equal(ANSWER);
+    });
     describe('with current signal', function() {
       it('should get the most current value', function() {
         var ANSWER, mainSignal, newValue, sinker;
