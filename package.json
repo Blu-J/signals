@@ -1,10 +1,9 @@
 {
   "name": "signals",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Creating a signals, values over time library to consume a callback and array",
   "main": "dist/signal.js",
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "chai": "3.3.0",
     "lodash": "3.10.1",
