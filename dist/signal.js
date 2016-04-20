@@ -423,8 +423,8 @@ exports.mergeObject = function (objectToMerge) {
         newAnswer[value[0]] = value[1];
         return newAnswer;
     }, {}, signal); };
-    var filterEmpty = function (signal) { return exports.filter(function (a) { return Object.keys(a).length > 0; }, signal); };
-    return filterEmpty(backToObject(joinedSignal));
+    var filterEmpty = exports.filter(function (a) { return Object.keys(a).length > 0; }, backToObject(joinedSignal));
+    return filterEmpty;
 };
 /**
  * { k` = Signal a`, k`` = Signal a``, ..., k^n = a^n} -> Signal { k` = a`, k`` = a``, ..., k^n = a^n}

@@ -29,7 +29,7 @@ export const Maybe = {
   }
 };
 
-const SignalActionValues = Object.keys(SignalActions).map(key => SignalActions[key]);
+const SignalActionValues = Object.keys(SignalActions).map(key => (<any>SignalActions)[key]);
 
 const isSignalAction = (a: SignalActions | any ): a is SignalActions => {
   if(SignalActionValues.indexOf(a) !== -1){
@@ -466,16 +466,16 @@ export const mergeObject = <A>(objectToMerge: {[key: string]: Signal<A>}): Signa
   const joinedSignal = setOfSignals.slice(1).reduce((joinedSignal, additionalSignal) => join(joinedSignal, additionalSignal), setOfSignals[0]);
   const backToObject = (signal:Signal<[string, A]>) => foldp((lastAnswer:{[key:string]: A}, value:[string, A]) => {
     const newAnswer = Object.keys(lastAnswer).reduce((answer, key) => {
-      answer[key] = lastAnswer[key];
+      (<any>answer)[key] = (<any>lastAnswer)[key];
       return answer;
     }, {});
-    newAnswer[value[0]] = value[1];
+    (<any>newAnswer)[value[0]] = (<any>value)[1];
     return newAnswer;
   }, {}, signal);
 
-  const filterEmpty = (signal: Signal<{[key:string]:A}>) => filter(a => Object.keys(a).length > 0, signal);
+  const filterEmpty = filter(a => Object.keys(a).length > 0, backToObject(joinedSignal));
 
-  return filterEmpty(backToObject(joinedSignal));
+  return <Signal<any>>filterEmpty;
 };
 
 /**
@@ -499,7 +499,7 @@ export const mergeObjectAnd = <A>(objectToMerge:{[key:string]: Signal<A>}): Sign
       if(Object.keys(next).length !== Object.keys(objectToMerge).length){
         return false;
       }
-      if((Object.keys(next) || []).every((newKey) => next[newKey] !== previous[newKey])){
+      if((Object.keys(next) || []).every((newKey) => (<any>next)[newKey] !== (<any>previous)[newKey])){
         return false;
       }
       return true;

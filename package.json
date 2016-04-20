@@ -13,7 +13,9 @@
     "promise-polyfill": "2.1.0"
   },
   "scripts": {
-    "test": "mocha -w"
+    "test": "mocha -w",
+    "build": "tsc",
+    "prePublish": "tsc"
   },
   "author": "",
   "license": "ISC"
