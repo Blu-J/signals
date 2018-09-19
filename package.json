@@ -5,8 +5,8 @@
   "main": "dist/signal.js",
   "dependencies": {},
   "devDependencies": {
-    "chai": "3.3.0",
-    "lodash": "3.10.1",
+    "chai": "4.1.2",
+    "lodash": "4.17.11",
     "mocha": "5.2.0",
     "path": "^0.12.7",
     "promise-polyfill": "8.1.0"
