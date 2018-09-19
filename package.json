@@ -9,7 +9,7 @@
     "lodash": "3.10.1",
     "mocha": "2.3.3",
     "path": "^0.12.7",
-    "promise-polyfill": "2.1.0"
+    "promise-polyfill": "8.1.0"
   },
   "scripts": {
     "test": "mocha -w",
